@@ -264,17 +264,22 @@
         bankoArayuz.otomatikAc();
     }
 
+    /* Sonuçlar tek seferde, eşzamanlı çiziliyor; gözlemci geri çağrısı geldiğinde
+       DOM tamam. Eskiden 320 ms bekleniyordu, karekod ürünlerden sonra geliyordu.
+       Aynı turdaki gözlemci çağrıları tek kontrolde birleşiyor. */
     var sonucBolumu = document.getElementById('resultsSection');
+    var kontrolBekliyor = false;
+    function topluSonucKontrolu() {
+        if (kontrolBekliyor || sonucBolumu.classList.contains('hidden')) return;
+        kontrolBekliyor = true;
+        setTimeout(function () { kontrolBekliyor = false; topluSonucGeldi(); }, 0);
+    }
     if (sonucBolumu && typeof MutationObserver !== 'undefined') {
-        new MutationObserver(function () {
-            if (!sonucBolumu.classList.contains('hidden')) setTimeout(topluSonucGeldi, 320);
-        }).observe(sonucBolumu, { attributes: true, attributeFilter: ['class'] });
+        new MutationObserver(topluSonucKontrolu).observe(sonucBolumu, { attributes: true, attributeFilter: ['class'] });
 
         ['resultsTableBody', 'gridResults', 'mobileResults'].forEach(function (kimlik) {
             var el = document.getElementById(kimlik);
-            if (el) new MutationObserver(function () {
-                if (!sonucBolumu.classList.contains('hidden')) setTimeout(topluSonucGeldi, 320);
-            }).observe(el, { childList: true });
+            if (el) new MutationObserver(topluSonucKontrolu).observe(el, { childList: true });
         });
     }
 

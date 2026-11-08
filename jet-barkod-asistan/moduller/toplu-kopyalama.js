@@ -80,7 +80,7 @@
      * sekme o an meşgulse cevap gelmiyor ve İKİNCİ bir sekme açılıyordu;
      * kullanıcı sayfanın yeniden yüklenmesini bekliyordu.
      */
-    function eskiYoldanGit() {
+    function eskiYoldanGit(yalnizAcik) {
         try {
             if (typeof BroadcastChannel !== 'undefined') {
                 var kanal = new BroadcastChannel('barcode_site_nav');
@@ -93,23 +93,26 @@
                 setTimeout(function () {
                     kanal.removeEventListener('message', dinle);
                     kanal.close();
-                    if (!cevap) window.open(SITE, '_blank');
+                    if (!cevap && !yalnizAcik) window.open(SITE, '_blank');
                 }, 700);
                 return;
             }
         } catch (e) { /* kanal yoksa aşağıdaki yol */ }
-        window.open(SITE, '_blank');
+        if (!yalnizAcik) window.open(SITE, '_blank');
     }
 
+    /* Asistan ayarı "Kopyalayınca Aramaya Geç": yalnız AÇIK arama sekmesine
+       geçilir, yoksa yeni sekme açılmaz (kullanıcı isteği). Arka plan cevap
+       vermezse eski yol (BroadcastChannel) da açık sekme yoksa bir şey açmaz. */
     function siteyeGit() {
         try {
-            chrome.runtime.sendMessage({ type: 'JBA_SITEYE_GIT', url: SITE }, function (cevap) {
+            chrome.runtime.sendMessage({ type: 'JBA_SITEYE_GIT', url: SITE, yalnizAcik: true }, function (cevap) {
                 if (chrome.runtime.lastError || !cevap || !cevap.ok) {
-                    eskiYoldanGit();
+                    eskiYoldanGit(true);
                 }
             });
         } catch (e) {
-            eskiYoldanGit();
+            eskiYoldanGit(true);
         }
     }
 
@@ -119,7 +122,7 @@
        yalnız "kopyalandı" bildiriminin görünmesi için. */
     function kopyalandiktanSonra() {
         yonlendirmeAcikMi().then(function (acik) {
-            if (acik) setTimeout(siteyeGit, 120);
+            if (acik) setTimeout(siteyeGit, 60);
         });
     }
 
@@ -195,10 +198,10 @@
     // ==================================================================
 
     function satirKopyala(tr) {
+        // Tek satır kopyası sekme değiştirmez; geçiş yalnız Tümünü Kopyala'da
         JBA.panoyaYaz(tr.outerHTML).then(function (oldu) {
             if (!oldu) return JBA.bildir('Kopyalanamadı, tekrar dene.', 'olumsuz');
             JBA.bildir('Ürün kopyalandı.', 'olumlu');
-            kopyalandiktanSonra();
         });
     }
 

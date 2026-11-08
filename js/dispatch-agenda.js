@@ -64,8 +64,25 @@ class DispatchAgendaApp {
 
         window.JBUrunHareketi?.saglayici((id) => this._hareketUrunu(id));
 
-        await this._loadProducts();
-        await this.loadItems();
+        /*
+         * HIZLI AÇILIŞ
+         * Eskiden kullanıcı verisi (ürünler) sunucudan gelene kadar bekleniyor,
+         * sonra kayıtlar soruluyordu: iki gidiş-dönüş art arda. Artık ürünler
+         * önbellekten (hizliBaslat), kayıtlar sunucuya aynı anda soruluyor; son
+         * bilinen liste de beklemeden çiziliyor, sunucu cevabı gelince yerine
+         * geçiyor.
+         */
+        this._urunSozu = this._loadProducts();
+        const kayitSozu = this.loadItems();
+        await this._urunSozu;
+        if (!this._sunucudanGeldi) {
+            const eski = this._kayitOnbellegi();
+            if (eski) { this.items = eski; this._listeCiz(); }
+        }
+        await kayitSozu;
+        window.addEventListener('jb:kullanici-verisi', () => {
+            void this._loadProducts().then(() => { if (!this.form) this._listeCiz(); });
+        });
 
         document.addEventListener('visibilitychange', () => {
             if (document.visibilityState === 'visible' && this._ready && !this.form && !this._yaziyor) void this.loadItems();
@@ -111,7 +128,9 @@ class DispatchAgendaApp {
     async _loadProducts() {
         try {
             if (window.userDataManager) {
-                await window.userDataManager.init();
+                // Önbellek öncelikli: sunucudaki fark gelirse jb:kullanici-verisi ile tazelenir
+                if (typeof window.userDataManager.hizliBaslat === 'function') await window.userDataManager.hizliBaslat();
+                else await window.userDataManager.init();
                 this.allProducts = window.userDataManager.getAllProducts(true) || [];
             }
             if ((!this.allProducts || !this.allProducts.length) && typeof PRODUCTS_DATA !== 'undefined') {
@@ -258,13 +277,31 @@ class DispatchAgendaApp {
             if (error) throw error;
             this.items = Array.isArray(data) ? data : [];
             this._yuklemeHatali = false;
-            await this._hatirlaticiyiEsitle();
+            this._sunucudanGeldi = true;
         } catch (e) {
             console.error('Ajanda yüklenemedi:', e);
-            this._yuklemeHatali = true;
+            // Önbellekten çizilmiş liste varsa hata ekranıyla silinmesin
+            this._yuklemeHatali = !this.items.length;
         }
+        // Görsel ve barkod ürün kataloğundan; katalog hazır olmadan çizilmez
+        if (this._urunSozu) await this._urunSozu;
         this._listeCiz();
         this._derinBaglantiyiAc();
+        // Hatırlatıcı eşitlemesi (ağ) listeyi bekletmesin
+        if (!this._yuklemeHatali) void this._hatirlaticiyiEsitle();
+    }
+
+    _onbellekAnahtari() { return 'jb_ajanda_kayitlar_' + this._username; }
+
+    _kayitOnbellegi() {
+        try {
+            const v = JSON.parse(localStorage.getItem(this._onbellekAnahtari()) || 'null');
+            return v && Array.isArray(v.items) && v.items.length ? v.items : null;
+        } catch (e) { return null; }
+    }
+
+    _kayitOnbellegeYaz() {
+        try { localStorage.setItem(this._onbellekAnahtari(), JSON.stringify({ zaman: Date.now(), items: this.items })); } catch (e) { /* kota */ }
     }
 
     _dateKey(item) {
@@ -319,6 +356,8 @@ class DispatchAgendaApp {
         const el = document.getElementById('agendaCardStrip');
         if (!el) return;
         el.setAttribute('aria-busy', 'false');
+        // Sonraki açılış bu listeyle beklemeden başlasın (ekle/sil de buradan geçiyor)
+        if (!this._yuklemeHatali && this._username) this._kayitOnbellegeYaz();
 
         const eksik = this.items.filter((x) => !this._fazlaMi(x));
         const fazla = this.items.filter((x) => this._fazlaMi(x));

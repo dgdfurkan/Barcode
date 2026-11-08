@@ -177,6 +177,8 @@
     var KOLON_YOLDA = /(el degistir|yolda|ulast)/;
     var KOLON_BITTI = /(teslim|iptal|tamamlan)/;
     var ESKIME_MS = 3 * 60 * 60 * 1000;
+    // Bu kadar yeni dolu liste karekodu bekletmeden kullanılır (canlı kanal arada tazeler)
+    var TAZE_MS = 3 * 60 * 1000;
 
     function sade(t) {
         return String(t || '').toLocaleLowerCase('tr')
@@ -488,15 +490,32 @@
             if (typeof disSecenekler.secildi === 'function') disSecenekler.secildi(no, kod(no));
         }
 
-        /** Toplu sonuç geldiğinde çağrılıyor: rastgele bir banko açılıyor. */
+        /*
+         * Toplu sonuç geldiğinde çağrılıyor: rastgele bir banko açılıyor.
+         *
+         * SUNUCUYU BEKLEMİYOR
+         * Eskiden dolu liste 5 sn'den eskiyse önce sunucuya soruluyordu; karekod
+         * ürünlerden 1-2 sn sonra geliyordu. Liste canlı kanalla sipariş değiştiği
+         * an, sekmeye dönülünce de (visibilitychange) tazeleniyor. Son 3 dakikada
+         * okunduysa karekod hemen açılıyor, liste arkada tazeleniyor. Hiç
+         * okunmadıysa en çok 400 ms beklenir; gelmezse eldekiyle açılır.
+         */
         function otomatikAc() {
             var s = secenekler();
             if (!s.otoAc) return;
-            // Dolu liste en fazla 5 sn eski; değilse önce tazelenir (bir gidiş-dönüş)
-            doluYukle(false).then(function () {
+            var ac = function () {
                 var no = rastgele();
                 if (no) goster(no, s.otoKapatSn);
-            });
+            };
+            if (doluZaman && Date.now() - doluZaman < TAZE_MS) {
+                ac();
+                doluYukle(false);
+                return;
+            }
+            var acildi = false;
+            var birKez = function () { if (!acildi) { acildi = true; ac(); } };
+            doluYukle(false).then(birKez, birKez);
+            setTimeout(birKez, 400);
         }
 
         /* Karekoda dokunmak "bunu beğenmedim, başkasını ver" demek. Fiziksel
@@ -586,6 +605,10 @@
         });
         doluYukle(false);
         canliBagla();
+        // Getir panelinden dönülürken liste tazelensin: karekod beklemeden açılsın
+        document.addEventListener('visibilitychange', function () {
+            if (document.visibilityState === 'visible') doluYukle(false);
+        });
 
         return {
             goster: goster,

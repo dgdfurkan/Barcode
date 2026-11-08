@@ -3662,59 +3662,33 @@
         let shouldScrollAfterSearch = false; // Flag to trigger scroll after search completes
         
         // Scroll to search area (between search section and initialState)
+        /*
+         * Sonuçlar çizilince sayfa arama kutusunun altına konuyor.
+         * Eskiden rAF + 200 ms + 150 ms bekleyip yumuşak kaydırıyordu: sonuçlar
+         * görünüyor, yarım saniye sonra sayfa kayıyordu. Artık sonuçlar çizildiği
+         * karede, boyamadan önce yerine konuyor; göz kaymayı görmüyor.
+         * Hedef eskisiyle aynı yer: arama kartının alt kenarının 1,1 katı
+         * (kullanıcının ayarladığı konum; eski formül sayfa en üstteyken buna
+         * iniyordu, sayfa aşağıdayken her aramada biraz daha aşağı kayıyordu).
+         */
         function scrollToSearchArea() {
             try {
-                // Find the exact elements: section.mb-8 > div.bg-surface and #initialState > div.bg-surface
                 const searchSection = document.querySelector('section.mb-8');
                 const searchSectionDiv = searchSection ? searchSection.querySelector('div.bg-surface') : null;
-                const initialStateEl = document.getElementById('initialState');
-                const initialStateDiv = initialStateEl ? initialStateEl.querySelector('div.bg-surface') : null;
-                
-                if (!searchSectionDiv || !initialStateDiv) {
-                    console.debug('Scroll: Search section div or initialState div not found');
-                    return;
-                }
-                
-                // Wait a bit for DOM to settle (especially after search results are displayed)
-                setTimeout(() => {
-                    // Get positions relative to document
-                    const searchRect = searchSectionDiv.getBoundingClientRect();
-                    const initialStateRect = initialStateDiv.getBoundingClientRect();
-                    
-                    const searchSectionBottom = searchRect.bottom + window.scrollY;
-                    const initialStateTop = initialStateRect.top + window.scrollY;
-                    
-                    // Calculate midpoint - this will be the scroll position (top of viewport)
-                    const calculatedMidpoint = (searchSectionBottom + initialStateTop) / 2;
-                    // Multiply by 2.2 (2 * 1.1) as requested by user
-                    const midpoint = calculatedMidpoint * 2.2;
-                    
-                    // Check if already near the target (within 50px) - optional optimization
-                    const currentScroll = window.scrollY;
-                    if (Math.abs(currentScroll - midpoint) < 50) {
-                        console.debug('Scroll: Already near target position');
-                        return;
-                    }
-                    
-                    // Smooth scroll to midpoint - this will position the midpoint at the top of the viewport
-                    window.scrollTo({
-                        top: midpoint,
-                        behavior: 'smooth'
-                    });
-                    
-                    console.debug('Scroll: Scrolling to midpoint between search section and initialState', {
-                        searchSectionBottom,
-                        initialStateTop,
-                        calculatedMidpoint,
-                        midpoint,
-                        currentScroll,
-                        searchRect: { top: searchRect.top, bottom: searchRect.bottom },
-                        initialStateRect: { top: initialStateRect.top, bottom: initialStateRect.bottom }
-                    });
-                }, 150); // Small delay to ensure DOM is fully updated
+                if (!searchSectionDiv) return;
+                const hedef = Math.round((searchSectionDiv.getBoundingClientRect().bottom + window.scrollY) * 1.1);
+                if (Math.abs(window.scrollY - hedef) < 2) return;
+                window.scrollTo({ top: hedef, behavior: 'instant' });
             } catch (error) {
                 console.warn('Scroll: Error during scroll:', error);
             }
+        }
+
+        /** Yapıştırılan sonuç çizildi: sayfayı aynı karede yerine koy. */
+        function sonucSonrasiKaydir() {
+            if (!shouldScrollAfterSearch) return;
+            shouldScrollAfterSearch = false;
+            scrollToSearchArea();
         }
         
         // View Mode Functions
@@ -4045,13 +4019,10 @@
                 // Varsa tablo verisini isimlere indirgeme
                 const parsed = typeof parseTableData === 'function' ? parseTableData(text) : text;
                 searchInput.value = parsed;
-                await copyResolvedTableQueryToClipboard(text, parsed);
-                
-                // Set flag to scroll after search completes
                 shouldScrollAfterSearch = true;
-                
-                // input event tetikle
-                searchInput.dispatchEvent(new Event('input', { bubbles: true }));
+                aramayiHemenYap(parsed);
+                // Panoya çözülmüş liste yazımı aramayı bekletmesin
+                copyResolvedTableQueryToClipboard(text, parsed).catch(() => {});
             } catch (err) {
                 console.warn('Panodan okuma başarısız:', err);
             }
@@ -4091,18 +4062,19 @@
                 if (text === lastClipboardText) return;
                 if (searchInput) {
                     searchInput.value = parsed;
-                    await copyResolvedTableQueryToClipboard(text, parsed);
-                    shouldScrollAfterSearch = true;
-                    searchInput.dispatchEvent(new Event('input', { bubbles: true }));
                     lastClipboardText = text;
                     lastPastTime = Date.now();
+                    shouldScrollAfterSearch = true;
+                    aramayiHemenYap(parsed);
+                    // Panoya çözülmüş liste yazımı aramayı bekletmesin
+                    copyResolvedTableQueryToClipboard(text, parsed).catch(() => {});
                 }
             } catch (e) {}
         }
 
         function scheduleAutoPaste() {
             if (autoPasteDebounceTimer) clearTimeout(autoPasteDebounceTimer);
-            autoPasteDebounceTimer = setTimeout(tryAutoPasteOnPageShow, 10);
+            autoPasteDebounceTimer = setTimeout(tryAutoPasteOnPageShow, 0);
         }
 
         document.addEventListener('visibilitychange', () => {
@@ -5268,16 +5240,8 @@
             
             scheduleProductSearchTitleFit(gridResultsContainer);
             
-            // Scroll to search area after results are displayed (if flag is set)
-            if (shouldScrollAfterSearch) {
-                // Use requestAnimationFrame to ensure DOM is fully updated
-                requestAnimationFrame(() => {
-                    setTimeout(() => {
-                        scrollToSearchArea();
-                        shouldScrollAfterSearch = false; // Reset flag
-                    }, 200); // Increased delay to ensure all rendering is complete
-                });
-            }
+            // Yapıştırmadan geldiyse sayfa aynı karede yerine (bkz. sonucSonrasiKaydir)
+            sonucSonrasiKaydir();
         }
         
         // Make functions globally accessible
@@ -7307,8 +7271,9 @@
                 return;
             }
 
-            // Show loading state for better UX
-            showSearchLoading();
+            /* Yükleniyor durumu gösterilmiyor: arama 1-40 ms sürüyor. Eskiden
+               önce "yükleniyor", bir kare sonra sonuçlar çiziliyordu; ekran iki
+               kez değişiyor, sonuçlar geç ve zıplayarak geliyordu. */
 
             // Check if input contains HTML tags
             const hasHtmlTags = /<[^>]+>/.test(query);
@@ -7366,8 +7331,7 @@
             // productImageMap is populated by parseHtmlTableWithImages
             // We'll use it in performOptimizedSearch to search by image URLs too
 
-            // Use requestAnimationFrame to prevent UI blocking
-            requestAnimationFrame(() => {
+            {
                 const searchResults = performOptimizedSearch(products, searchTerms, isTableData);
                 
                 // Handle grouped results differently
@@ -7381,7 +7345,21 @@
                 }
                 
                 displayResults(searchResults);
-            });
+                // Sonuç yoksa kaydırma isteği sonraki aramaya taşınmasın
+                shouldScrollAfterSearch = false;
+            }
+        }
+
+        /*
+         * Kutuyu biz doldurduk (otomatik yapıştırma, Yapıştır düğmesi): yazma
+         * beklemesi (150 ms) yok, arama hemen. `input` olayı yine gönderiliyor;
+         * temizle düğmesi ve eklentiler onu dinliyor. Olayın kurduğu gecikmeli
+         * arama iptal ediliyor ki aynı arama iki kez çizilmesin.
+         */
+        function aramayiHemenYap(sorgu) {
+            searchInput.dispatchEvent(new Event('input', { bubbles: true }));
+            clearTimeout(searchInput.searchTimeout);
+            performSearch(sorgu);
         }
 
         // Advanced search algorithm with grouped results for comma-separated terms
@@ -8365,16 +8343,8 @@
             
             scheduleProductSearchTitleFit(document.getElementById('resultsSection'));
             
-            // Scroll to search area after results are displayed (if flag is set)
-            if (shouldScrollAfterSearch) {
-                // Use requestAnimationFrame to ensure DOM is fully updated
-                requestAnimationFrame(() => {
-                    setTimeout(() => {
-                        scrollToSearchArea();
-                        shouldScrollAfterSearch = false; // Reset flag
-                    }, 200); // Increased delay to ensure all rendering is complete
-                });
-            }
+            // Yapıştırmadan geldiyse sayfa aynı karede yerine (bkz. sonucSonrasiKaydir)
+            sonucSonrasiKaydir();
         }
 
         // Display grouped results for comma-separated search
@@ -8557,6 +8527,7 @@
             });
             
             scheduleProductSearchTitleFit(document.getElementById('resultsSection'));
+            sonucSonrasiKaydir();
         }
 
         // State management functions
@@ -12374,8 +12345,8 @@
         });
     </script>
 <script src="../js/oneri-motoru.js?v=20260901a"></script>
-<script src="../js/banko.js?v=20261014a"></script>
-<script src="../js/arama-eklentileri.js?v=20260901i"></script>
+<script src="../js/banko.js?v=20261108a"></script>
+<script src="../js/arama-eklentileri.js?v=20261108a"></script>
 <script src="../js/tartili-barkod.js?v=20261031b"></script>
 </body>
 </html>

@@ -35,7 +35,7 @@ function aramaSayfasiMi(url) {
     return typeof url === 'string' && /jetbarkod\.com\.tr\/arama(\/|$|\?)/i.test(url);
 }
 
-async function siteyeGit(istenenUrl) {
+async function siteyeGit(istenenUrl, yalnizAcik) {
     const url = typeof istenenUrl === 'string' && istenenUrl
         ? istenenUrl
         : 'https://jetbarkod.com.tr/arama/';
@@ -47,7 +47,9 @@ async function siteyeGit(istenenUrl) {
         sekmeler = [];
     }
 
-    const hedef = sekmeler.find((t) => aramaSayfasiMi(t.url)) || sekmeler[0] || null;
+    // yalnizAcik: Toplu Kopyalama ayarı; yalnız açık ARAMA sekmesine geçilir, yeni sekme açılmaz
+    const hedef = sekmeler.find((t) => aramaSayfasiMi(t.url)) || (yalnizAcik ? null : sekmeler[0]) || null;
+    if (!hedef && yalnizAcik) return { ok: true, acikSekme: false, gecilmedi: true };
 
     if (hedef) {
         try {
@@ -73,7 +75,7 @@ async function siteyeGit(istenenUrl) {
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (!message || message.type !== 'JBA_SITEYE_GIT') return;
-    siteyeGit(message.url).then(sendResponse, function (e) {
+    siteyeGit(message.url, message.yalnizAcik === true).then(sendResponse, function (e) {
         sendResponse({ ok: false, hata: e && e.message ? e.message : 'bilinmeyen hata' });
     });
     return true; // asenkron cevap

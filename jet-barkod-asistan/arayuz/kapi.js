@@ -188,6 +188,18 @@
         });
     }
 
+    /* Kopyalayınca aramaya geç (moduller/toplu-kopyalama.js okuyor; varsayılan kapalı) */
+    var aramayaGec = document.getElementById('aramayaGec');
+    if (aramayaGec) {
+        chrome.storage.local.get('getirAutoRedirect', function (r) {
+            var d = r && r.getirAutoRedirect;
+            aramayaGec.value = d === true || d === 'true' ? '1' : '0';
+        });
+        aramayaGec.addEventListener('change', function () {
+            chrome.storage.local.set({ getirAutoRedirect: aramayaGec.value === '1' });
+        });
+    }
+
     /* Son kontrolün sonucu: nöbetçinin çalıştığı buradan görülüyor */
     var firinDurum = document.getElementById('firinDurum');
     function saatYaz(t) {
