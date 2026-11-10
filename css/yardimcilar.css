@@ -9,6 +9,16 @@
 .yrd-baslik h1 { margin: 0; font-family: var(--baslik-font); font-size: 26px; line-height: 32px; font-weight: 800; letter-spacing: -0.01em; color: var(--yazi); }
 .yrd-baslik p { margin: 4px 0 0; font-size: 13px; color: var(--sonuk); }
 
+/* Araçlar | Görevler: sayfa sekmesi alt çizgili; içteki görünüm seçicisiyle (kutulu) karışmasın */
+.yrd-sekmeler { margin-top: 16px; display: flex; gap: 24px; border-bottom: 1px solid var(--cizgi); }
+.yrd-sekmeler button { position: relative; height: 44px; padding: 0 4px; border: 0; background: transparent; font-size: 15px; font-weight: 700; color: var(--sonuk);
+    transition: color var(--motion-micro) var(--motion-ease-standard); }
+.yrd-sekmeler button::after { content: ''; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; border-radius: 999px; background: var(--mavi);
+    opacity: 0; transform: scaleX(0.6); transition: opacity var(--motion-fast) var(--motion-ease-out), transform var(--motion-fast) var(--motion-ease-out); }
+.yrd-sekmeler button[aria-selected="true"] { color: var(--yazi); }
+.yrd-sekmeler button[aria-selected="true"]::after { opacity: 1; transform: none; }
+.yrd-sekmeler button:focus-visible { outline: 2px solid var(--mavi); outline-offset: 2px; border-radius: 6px; }
+
 /* Telegram şeridi */
 .yrd-tg { margin-top: 24px; min-height: 72px; padding: 12px 16px; display: flex; align-items: center; gap: 12px;
     border-radius: 16px; background: var(--mavi-50); border: 1px solid var(--mavi-100); }
@@ -85,6 +95,7 @@ a.yrd-kart:hover .yrd-kart__ok { transform: translateX(2px); color: var(--mavi);
 }
 @media (prefers-reduced-motion: reduce) {
     .yrd-iskelet { animation: none; }
+    .yrd-sekmeler button, .yrd-sekmeler button::after { transition: none; }
     .yrd-kart, .yrd-kart__ok, .yrd-tg__dugme { transition: none; }
     a.yrd-kart:hover, a.yrd-kart:active, a.yrd-kart:hover .yrd-kart__ok { transform: none; }
 }

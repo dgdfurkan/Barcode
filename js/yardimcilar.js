@@ -277,6 +277,44 @@
         }
     }
 
+    /* Araçlar | Görevler. Seçim adreste (?sekme=gorevler) ve bu cihazda hatırlanır.
+       Görevler ilk açılışta kurulur (js/depo-gorev.js). */
+    var SEKME_ALT = {
+        araclar: 'Günlük işi kısaltan araçlar. Hesabında açık olanlar kullanılabilir.',
+        gorevler: 'Depodaki tekrar eden işler. Liste her sabah 08:00\'de yenilenir.'
+    };
+
+    function sekmeleriKur(kullanici) {
+        var ilk = null;
+        try { ilk = new URLSearchParams(global.location.search).get('sekme'); } catch (e) { ilk = null; }
+        if (ilk !== 'gorevler' && ilk !== 'araclar') {
+            try { ilk = localStorage.getItem('jb_yardimci_sekme'); } catch (e) { ilk = null; }
+        }
+        var sec = function (ad, ilkKez) {
+            if (ad !== 'gorevler') ad = 'araclar';
+            Array.prototype.forEach.call(document.querySelectorAll('.yrd-sekmeler [data-sekme]'), function (b) {
+                b.setAttribute('aria-selected', String(b.getAttribute('data-sekme') === ad));
+            });
+            el('yrdAraclar').hidden = ad !== 'araclar';
+            el('yrdGorev').hidden = ad !== 'gorevler';
+            el('yrdAlt').textContent = SEKME_ALT[ad];
+            if (ad === 'gorevler' && global.JBDepoGorev) global.JBDepoGorev.kur(el('yrdGorev'), kullanici);
+            if (!ilkKez) {
+                try { localStorage.setItem('jb_yardimci_sekme', ad); } catch (e) { /* yok */ }
+                try {
+                    var u = new URL(global.location.href);
+                    if (ad === 'gorevler') u.searchParams.set('sekme', 'gorevler'); else u.searchParams.delete('sekme');
+                    global.history.replaceState(global.history.state, '', u.pathname + u.search + u.hash);
+                } catch (e) { /* yok */ }
+            }
+        };
+        document.querySelector('.yrd-sekmeler').addEventListener('click', function (e) {
+            var b = e.target.closest('[data-sekme]');
+            if (b) sec(b.getAttribute('data-sekme'));
+        });
+        sec(ilk, true);
+    }
+
     async function basla() {
         var o = null;
         try { o = (global.authUtils && global.authUtils.checkAuth()) || null; } catch (e) { o = null; }
@@ -289,6 +327,7 @@
         serit.setAttribute('aria-busy', 'true');
         el('yrdListe').innerHTML = listeHtml(kartIskelet);
         el('yrdIcerik').hidden = false;
+        sekmeleriKur(o.username);
         var p = await haklariYukle();
         el('yrdListe').innerHTML = listeHtml(function (a) { return kartCiz(a, p); });
         document.addEventListener('click', function (e) { if (e.target.closest('#yrdBagla')) telegramBagla(); });
