@@ -4,8 +4,9 @@
 -- Çalıştırma (VPS):  sudo -u postgres psql -d jetbarkod < depo_gorev.sql
 --
 -- depo_gorev
---   Hesabın görev listesi: ad, grup, sıklık (kaç günde bir) ve sırayla
---   yapılan işler için öğeler (donuk dolaplar gibi: her gün biri).
+--   Hesabın görev listesi: ad, grup, sıklık (kaç günde bir), sırayla
+--   yapılan işler için öğeler (donuk dolaplar gibi: her gün biri),
+--   küçük resimler (Getir ürün görseli adresleri, en çok 3) ve çizim adı.
 --
 -- depo_gorev_gun
 --   Bir görevin bir iş günündeki durumu. İş günü 08:00'de başlar.
@@ -31,6 +32,9 @@ CREATE TABLE IF NOT EXISTS public.depo_gorev (
     ogeler          JSONB       NOT NULL DEFAULT '[]'::jsonb
                     CHECK (jsonb_typeof(ogeler) = 'array' AND pg_column_size(ogeler) < 8192),
     sirali          BOOLEAN     NOT NULL DEFAULT false,
+    gorseller       JSONB       NOT NULL DEFAULT '[]'::jsonb
+                    CHECK (jsonb_typeof(gorseller) = 'array' AND pg_column_size(gorseller) < 4096),
+    cizim           TEXT        NOT NULL DEFAULT '' CHECK (char_length(cizim) <= 20),
     sira            INTEGER     NOT NULL DEFAULT 0,
     olusturuldu_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
     guncellendi_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -50,6 +54,10 @@ CREATE TABLE IF NOT EXISTS public.depo_gorev_gun (
     FOREIGN KEY (username, gorev_id) REFERENCES public.depo_gorev (username, id)
         ON UPDATE CASCADE ON DELETE CASCADE
 );
+
+-- Önceki sürümle kurulduysa görsel alanları sonradan eklenir
+ALTER TABLE public.depo_gorev ADD COLUMN IF NOT EXISTS gorseller JSONB NOT NULL DEFAULT '[]'::jsonb;
+ALTER TABLE public.depo_gorev ADD COLUMN IF NOT EXISTS cizim TEXT NOT NULL DEFAULT '';
 
 CREATE INDEX IF NOT EXISTS idx_depo_gorev_gun_tarih ON public.depo_gorev_gun (username, gun DESC);
 
