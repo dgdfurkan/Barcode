@@ -414,7 +414,7 @@
         }
     }
 
-    function yaziyorMu() { return (D.yaziyor || 0) > 0 || Date.now() - (D.sonYazma || 0) < YAZMA_KORUMA_MS; }
+    function yaziyorMu() { return bekleyenYazmalar.size > 0 || (D.yaziyor || 0) > 0 || Date.now() - (D.sonYazma || 0) < YAZMA_KORUMA_MS; }
 
     /* Hafif okuma: iş listesi + bugünün satırları. Eski günler yerinde kalır. */
     async function yukleHafif() {
@@ -447,24 +447,55 @@
         return null;
     }
 
-    function gunAyarla(gorevId, oge, alanlar) {
+    /*
+     * YAZMA KUYRUĞU
+     * Tik ekranda hemen değişir; sunucuya YAZMA_BEKLE_MS sonra tek seferde gider.
+     * Arka arkaya tikleyip geri almak tek isteğe iner (son hal gider), istekler
+     * birbirini geçip yanlış hali yazamaz. Sekme kapanırken bekleyenler hemen gider.
+     */
+    var YAZMA_BEKLE_MS = 500;
+    var bekleyenYazmalar = new Map();
+
+    function bayraklar(s) { return s ? [!!s.yapildi, !!s.eklendi, !!s.ertelendi].join() : 'false,false,false'; }
+
+    function gunAyarla(gorevId, oge, alanlar, kutla) {
         var gun = isGunu();
         var s = gunSatiri(gorevId, gun, oge);
-        var eski = s ? Object.assign({}, s) : null;
+        var anahtar = gorevId + '|' + gun + '|' + (oge || '');
+        var b = bekleyenYazmalar.get(anahtar);
+        if (!b) {
+            b = { sunucudaki: s ? Object.assign({}, s) : null, zaman: null };
+            bekleyenYazmalar.set(anahtar, b);
+        }
         if (!s) {
             s = { gorev_id: gorevId, gun: gun, oge: oge || '', yapildi: false, eklendi: false, ertelendi: false };
             D.gunler.push(s);
         }
+        b.satir = s;
         Object.assign(s, alanlar);
-        ciz();
-        var govde = Object.assign({ username: D.kullanici, gorev_id: gorevId, gun: gun, oge: oge || '', zaman: new Date().toISOString() }, alanlar);
-        return sunucuya(function (d) {
+        guncelle(kutla);
+        clearTimeout(b.zaman);
+        b.zaman = setTimeout(function () { yazmaGonder(anahtar); }, YAZMA_BEKLE_MS);
+    }
+
+    function yazmaGonder(anahtar) {
+        var b = bekleyenYazmalar.get(anahtar);
+        if (!b) return;
+        bekleyenYazmalar.delete(anahtar);
+        clearTimeout(b.zaman);
+        var s = b.satir;
+        // Tiklenip geri alındıysa sunucudaki hal değişmedi: istek yok
+        if (bayraklar(b.sunucudaki) === bayraklar(s)) { D.sonYazma = Date.now(); return; }
+        var govde = { username: D.kullanici, gorev_id: s.gorev_id, gun: s.gun, oge: s.oge || '', yapildi: !!s.yapildi, eklendi: !!s.eklendi, ertelendi: !!s.ertelendi, zaman: new Date().toISOString() };
+        sunucuya(function (d) {
             return d.from('depo_gorev_gun').upsert(govde, { onConflict: 'username,gorev_id,gun,oge' });
         }, function () {
-            if (eski) Object.assign(s, eski);
-            else D.gunler.splice(D.gunler.indexOf(s), 1);
+            if (b.sunucudaki) Object.assign(s, b.sunucudaki);
+            else { var i = D.gunler.indexOf(s); if (i > -1) D.gunler.splice(i, 1); }
         });
     }
+
+    function yazmalariGonder() { Array.from(bekleyenYazmalar.keys()).forEach(yazmaGonder); }
 
     function gorevKaydet(g, eski, sessiz) {
         if (!sessiz) ciz();
@@ -582,7 +613,7 @@
     var planYon = 'ileri';
     var sonImza = '';
     var gorunumDegisti = true;
-    var sonTiklanan = null;
+    var sonYapi = '';
     var oncekiTamam = null;
 
     var IKON_TIK = '<svg class="gv-tik__isaret" viewBox="0 0 24 24" aria-hidden="true"><path d="m7 12.5 3.2 3.2L17 9"/></svg>';
@@ -612,7 +643,7 @@
             var katlar = '';
             for (var i = 1; i <= kat; i++) katlar += '<i class="gv-karo__kat gv-karo__kat--' + i + '"></i>';
             return '<span class="' + sinif + ' gv-karo--urun" aria-hidden="true">' + katlar +
-                '<span class="gv-karo__on"><img src="' + kacis(g.gorseller[0]) + '" alt="" loading="lazy" decoding="async" width="40" height="40" onerror="this.style.visibility=\'hidden\'"></span></span>';
+                '<span class="gv-karo__on"><img src="' + kacis(g.gorseller[0]) + '" alt="" decoding="sync" width="40" height="40" onerror="this.style.visibility=\'hidden\'"></span></span>';
         }
         return '<span class="' + sinif + ' gv-karo--ikon" aria-hidden="true">' + svg(IKON[grupBul(g.grup).ad] || IKON.diger) + '</span>';
     }
@@ -627,37 +658,41 @@
             '</svg>';
     }
 
-    /* Hepsi bitince bir kez: halkanın çevresinde 8 parçacık açılır (kutlama, tek seferlik) */
-    function kutlama() {
-        var p = '';
-        for (var i = 0; i < 8; i++) {
-            var a = (i / 8) * Math.PI * 2;
-            p += '<i style="--x:' + (Math.cos(a) * 52).toFixed(1) + 'px;--y:' + (Math.sin(a) * 52).toFixed(1) + 'px;--g:' + (i * 25) + 'ms"></i>';
-        }
-        return '<span class="gv-kutlama" aria-hidden="true">' + p + '</span>';
+    function sayiHtml(tamam, biten, toplam) {
+        return tamam ? svg('<path d="m6.5 12.5 3.8 3.8L18 8.5"/>', 'gv-ust__tamam') : '<b>' + biten + '</b><small>/' + toplam + '</small>';
+    }
+
+    function ustBaslik(tamam, biten, toplam) {
+        return tamam ? 'Bugünün İşleri Tamam' : toplam ? (toplam - biten) + ' iş kaldı' : 'Bugün iş yok';
+    }
+
+    var MINI_CEVRE = 2 * Math.PI * 18;
+    function miniHalka(gr, b, n) {
+        var oran = n ? b / n : 0;
+        return '<div class="gv-mini gv--' + gr.renk + (n && b === n ? ' is-tamam' : '') + '" data-mini="' + gr.ad + '">' +
+            '<span class="gv-mini__halka"><svg class="gv-mini__svg" viewBox="0 0 44 44" aria-hidden="true"><circle class="gv-mini__iz" cx="22" cy="22" r="18"/>' +
+            '<circle class="gv-mini__dolu" cx="22" cy="22" r="18" stroke-dasharray="' + MINI_CEVRE.toFixed(2) + '" stroke-dashoffset="' + (MINI_CEVRE * (1 - oran)).toFixed(2) + '"/></svg>' +
+            svg(IKON[gr.ad] || IKON.diger, 'gv-mini__ikon') + svg('<path d="m6.5 12.5 3.8 3.8L18 8.5"/>', 'gv-mini__tik') + '</span>' +
+            '<span class="gv-mini__ad">' + kacis(gr.baslik) + '</span><span class="gv-mini__sayi">' + b + '/' + n + '</span></div>';
     }
 
     function ustKart(bugun, liste) {
         var toplam = liste.length;
         var biten = liste.filter(function (x) { return x.d.yapildi; }).length;
         var tamam = toplam > 0 && biten === toplam;
-        var kutla = tamam && oncekiTamam === false && !azHareket;
         oncekiTamam = tamam;
-        var seritler = gruplanmis(liste).map(function (x) {
-            var b = x.gorevler.filter(function (y) { return y.d.yapildi; }).length;
-            return '<div class="gv-serit gv--' + x.grup.renk + '">' +
-                '<span class="gv-serit__ad">' + svg(IKON[x.grup.ad] || IKON.diger) + kacis(x.grup.baslik) + '</span>' +
-                '<span class="gv-serit__cubuk"><i data-olcek="s-' + x.grup.ad + '" style="transform:scaleX(' + (b / x.gorevler.length).toFixed(3) + ')"></i></span>' +
-                '<span class="gv-serit__sayi">' + b + '/' + x.gorevler.length + '</span></div>';
+        var miniler = gruplanmis(liste).map(function (x) {
+            return miniHalka(x.grup, x.gorevler.filter(function (y) { return y.d.yapildi; }).length, x.gorevler.length);
         }).join('');
         return '<section class="gv-ust' + (tamam ? ' is-tamam' : '') + '">' +
-            '<div class="gv-ust__halka">' + halka(toplam ? biten / toplam : 0, tamam) + (kutla ? kutlama() : '') +
-            '<span class="gv-ust__sayi">' + (tamam ? svg('<path d="m6.5 12.5 3.8 3.8L18 8.5"/>', 'gv-ust__tamam') : '<b>' + biten + '</b><small>/' + toplam + '</small>') + '</span></div>' +
-            '<div class="gv-ust__metin"><strong>' + (tamam ? 'Bugünün İşleri Tamam' : toplam ? (toplam - biten) + ' iş kaldı' : 'Bugün iş yok') + '</strong>' +
-            '<span>' + kacis(gunAdi(bugun)) + ' · 08:00\'de yenilenir</span>' +
-            (D.yerel ? '<span class="gv-ust__uyari">' + svg('<circle cx="12" cy="12" r="9"/><path d="M12 7.5v5M12 16v.5"/>') + 'Sunucuda görev tablosu henüz yok: liste ve tikler şimdilik yalnız bu cihazda. Tablo kurulunca bu cihazdaki liste kendiliğinden sunucuya geçer.</span>' : '') +
-            '</div>' +
-            (seritler ? '<div class="gv-ust__seritler">' + seritler + '</div>' : '') +
+            '<div class="gv-ust__ana"><div class="gv-ust__halka">' + halka(toplam ? biten / toplam : 0, tamam) +
+            '<span class="gv-ust__sayi">' + sayiHtml(tamam, biten, toplam) + '</span></div>' +
+            '<div class="gv-ust__metin"><span class="gv-ust__tarih">' + kacis(gunAdi(bugun)) + '</span>' +
+            '<strong class="gv-ust__baslik">' + ustBaslik(tamam, biten, toplam) + '</strong>' +
+            '<span class="gv-ust__alt">Liste her sabah 08:00\'de yenilenir</span>' +
+            (D.yerel ? '<span class="gv-ust__uyari">' + svg('<circle cx="12" cy="12" r="9"/><path d="M12 7.5v5M12 16v.5"/>') + 'Sunucuda görev tablosu henüz yok: liste ve tikler şimdilik yalnız bu cihazda.</span>' : '') +
+            '</div></div>' +
+            (miniler ? '<div class="gv-ust__gruplar">' + miniler + '</div>' : '') +
             '</section>';
     }
 
@@ -697,7 +732,7 @@
         // Yapılınca düğme kalkar ama yeri kalır: ad yeniden sarılıp satır boyu oynamasın
         var cikar = d.yapildi ? '<span class="gv-ikon-yer" aria-hidden="true"></span>'
             : '<button type="button" class="gv-ikon-dugme" data-eylem="cikar" aria-label="Bugünden çıkar" title="Bugünden çıkar">' + svg(IKON_SONRA) + '</button>';
-        return '<div class="gv-satir gv--' + grupBul(g.grup).renk + (d.yapildi ? ' is-tamam' : '') + (sonTiklanan === g.id ? ' is-yeni' : '') + '" data-id="' + g.id + '"' +
+        return '<div class="gv-satir gv--' + grupBul(g.grup).renk + (d.yapildi ? ' is-tamam' : '') + '" data-id="' + g.id + '"' +
             (!g.sirali ? ' data-satir-tik' : '') + '>' + tik + karo(g) +
             '<div class="gv-satir__metin"><span class="gv-ad">' + kacis(g.ad) + '</span>' + etiketler(g, d) +
             (g.sirali ? turHtml(g, bugun) : '') + '</div>' + cikar + '</div>';
@@ -712,9 +747,11 @@
 
         var gruplar = gruplanmis(liste).map(function (x) {
             var b = x.gorevler.filter(function (y) { return y.d.yapildi; }).length;
-            return '<section class="gv-grup gv--' + x.grup.renk + '">' +
+            var gt = b === x.gorevler.length;
+            return '<section class="gv-grup gv--' + x.grup.renk + (gt ? ' is-tamam' : '') + '" data-grup="' + x.grup.ad + '">' +
                 '<header class="gv-grup__bas"><span class="gv-grup__ikon">' + svg(IKON[x.grup.ad] || IKON.diger) + '</span>' +
-                '<h3>' + kacis(x.grup.baslik) + '</h3><span class="gv-grup__sayi">' + b + '/' + x.gorevler.length + '</span>' +
+                '<h3>' + kacis(x.grup.baslik) + '</h3><span class="gv-grup__durum"><span class="gv-grup__sayi">' + b + '/' + x.gorevler.length + '</span>' +
+                '<span class="gv-grup__rozet">' + svg('<path d="m6.5 12.5 3.8 3.8L18 8.5"/>') + 'Tamam</span></span>' +
                 '<span class="gv-grup__cubuk"><i data-olcek="g-' + x.grup.ad + '" style="transform:scaleX(' + (b / x.gorevler.length).toFixed(3) + ')"></i></span></header>' +
                 '<div class="gv-grup__liste">' + x.gorevler.map(function (y) { return satirHtml(y, bugun); }).join('') + '</div></section>';
         }).join('');
@@ -841,7 +878,7 @@
         var govde = kok.querySelector('.gv-govde');
         var eski = gorunumDegisti ? {} : olcekleriOku();
         govde.innerHTML = gorunum === 'plan' ? planHtml() : gorunum === 'duzenle' ? duzenleHtml() : bugunHtml();
-        sonTiklanan = null;
+        sonYapi = gorunum === 'bugun' ? yapiAnahtari(bugunModel()) : '';
         govde.classList.remove('is-giris');
         if (gorunumDegisti) {
             void govde.offsetWidth;
@@ -856,6 +893,189 @@
         sonImza = imza();
     }
 
+    // ------------------------------------------------------------------
+    // Yerinde güncelleme: tik atınca liste baştan çizilmez, yalnız değişen
+    // parçalar güncellenir (yazı ve resim göz kırpmaz, çubuk ve halka kayar)
+    // ------------------------------------------------------------------
+
+    function bugunModel() {
+        var bugun = isGunu();
+        var hepsi = D.gorevler.map(function (g) { return { g: g, d: durum(g, bugun) }; });
+        var liste = hepsi.filter(function (x) { return x.d.bugunde; });
+        return { bugun: bugun, liste: liste, disarda: hepsi.filter(function (x) { return !x.d.bugunde; }), gruplar: gruplanmis(liste) };
+    }
+
+    /* Bu anahtar değişmediyse sayfanın iskeleti aynıdır: yerinde güncellenir */
+    function yapiAnahtari(m) {
+        return JSON.stringify([D.yerel, !!D.aktarimBekliyor, m.bugun, m.liste.length === 0,
+            m.gruplar.map(function (x) {
+                return [x.grup.ad, x.gorevler.map(function (y) {
+                    var g = y.g;
+                    var ek = g.sirali ? g.ogeler.filter(function (o) { return !tur(g, m.bugun).biten[o]; }).join('/') : '';
+                    return [g.id, g.ad, g.gorseller[0] || '', g.cizim, g.siklik, ek, !!y.d.eklendi, y.d.gecikme];
+                })];
+            }),
+            m.disarda.map(function (x) { return [x.g.id, x.g.ad, x.d.ertelendi, x.d.sonraki, x.g.siklik, x.g.ogeler.length]; })]);
+    }
+
+    function guncelle(kutla) {
+        if (gorunum !== 'bugun' || !yerindeGuncelle(kutla)) ciz();
+    }
+
+    function setYaz(el, metin) { if (el && el.textContent !== metin) el.textContent = metin; }
+
+    function yerindeGuncelle(kutla) {
+        if (!kok || !D.yuklendi) return false;
+        var m = bugunModel();
+        if (yapiAnahtari(m) !== sonYapi) return false;
+        var yeniGrupTamam = [];
+        m.gruplar.forEach(function (x) {
+            var b = 0;
+            x.gorevler.forEach(function (y) {
+                var g = y.g, d = y.d;
+                if (d.yapildi) b++;
+                var satir = kok.querySelector('.gv-satir[data-id="' + g.id + '"]');
+                if (!satir) return;
+                var once = satir.classList.contains('is-tamam');
+                satir.classList.toggle('is-tamam', d.yapildi);
+                var tik = satir.querySelector('.gv-tik');
+                tik.setAttribute('aria-pressed', String(d.yapildi));
+                tik.setAttribute('aria-label', g.ad + (d.yapildi ? ' yapıldı' : ' yapılmadı'));
+                var son = satir.lastElementChild;
+                if (d.yapildi && son.classList.contains('gv-ikon-dugme')) son.outerHTML = '<span class="gv-ikon-yer" aria-hidden="true"></span>';
+                else if (!d.yapildi && son.classList.contains('gv-ikon-yer')) son.outerHTML = '<button type="button" class="gv-ikon-dugme" data-eylem="cikar" aria-label="Bugünden çıkar" title="Bugünden çıkar">' + svg(IKON_SONRA) + '</button>';
+                if (g.sirali && g.ogeler.length) {
+                    var t = tur(g, m.bugun);
+                    var kalan = g.ogeler.filter(function (o) { return !t.biten[o]; });
+                    var bitenSayi = g.ogeler.length - kalan.length + kalan.filter(function (o) { return t.bugun[o]; }).length;
+                    Array.prototype.forEach.call(satir.querySelectorAll('.gv-cip[data-oge]'), function (c) {
+                        var on = !!t.bugun[c.getAttribute('data-oge')];
+                        var oncekiOn = c.classList.contains('is-tamam');
+                        c.classList.toggle('is-tamam', on);
+                        c.setAttribute('aria-pressed', String(on));
+                        if (on && !oncekiOn && kutla === g.id + '|' + c.getAttribute('data-oge')) cipKutla(c);
+                    });
+                    Array.prototype.forEach.call(satir.querySelectorAll('.gv-tur__parca i'), function (p, i) { p.classList.toggle('is-dolu', i < bitenSayi); });
+                    setYaz(satir.querySelector('.gv-tur__yazi'), 'Bu tur ' + bitenSayi + '/' + g.ogeler.length);
+                }
+                if (d.yapildi && !once && kutla && (kutla === g.id || kutla.indexOf(g.id + '|') === 0)) satirKutla(satir);
+            });
+            var bolum = kok.querySelector('.gv-grup[data-grup="' + x.grup.ad + '"]');
+            if (!bolum) return;
+            var n = x.gorevler.length;
+            var gt = b === n;
+            if (gt && !bolum.classList.contains('is-tamam') && kutla) yeniGrupTamam.push(bolum);
+            bolum.classList.toggle('is-tamam', gt);
+            var sayi = bolum.querySelector('.gv-grup__sayi');
+            if (sayi.textContent !== b + '/' + n) { sayi.textContent = b + '/' + n; zipla(sayi); }
+            bolum.querySelector('.gv-grup__cubuk i').style.transform = 'scaleX(' + (b / n).toFixed(3) + ')';
+            var mini = kok.querySelector('.gv-mini[data-mini="' + x.grup.ad + '"]');
+            if (mini) {
+                var miniOnce = mini.classList.contains('is-tamam');
+                mini.classList.toggle('is-tamam', gt);
+                mini.querySelector('.gv-mini__dolu').setAttribute('stroke-dashoffset', (MINI_CEVRE * (1 - b / n)).toFixed(2));
+                setYaz(mini.querySelector('.gv-mini__sayi'), b + '/' + n);
+                if (kutla && (gt !== miniOnce || true)) zipla(mini.querySelector('.gv-mini__halka'));
+            }
+        });
+        // Üst kart
+        var ust = kok.querySelector('.gv-ust');
+        if (ust) {
+            var toplam = m.liste.length;
+            var biten = m.liste.filter(function (x) { return x.d.yapildi; }).length;
+            var tamam = toplam > 0 && biten === toplam;
+            var ustOnce = ust.classList.contains('is-tamam');
+            ust.classList.toggle('is-tamam', tamam);
+            ust.querySelector('.gv-halka').classList.toggle('is-tamam', tamam);
+            var dolu = ust.querySelector('.gv-halka__dolu');
+            var cevre = 2 * Math.PI * 34;
+            dolu.setAttribute('stroke-dashoffset', (cevre * (1 - (toplam ? biten / toplam : 0))).toFixed(2));
+            var sayiKutu = ust.querySelector('.gv-ust__sayi');
+            var yeniSayi = sayiHtml(tamam, biten, toplam);
+            if (sayiKutu.innerHTML !== yeniSayi) {
+                sayiKutu.innerHTML = yeniSayi;
+                var bb = sayiKutu.querySelector('b');
+                if (bb && kutla) zipla(bb, 'is-say');
+            }
+            setYaz(ust.querySelector('.gv-ust__baslik'), ustBaslik(tamam, biten, toplam));
+            if (tamam && !ustOnce && kutla) buyukKutlama(ust);
+            oncekiTamam = tamam;
+        }
+        yeniGrupTamam.forEach(function (bolum) { if (!(ust && ust.classList.contains('is-tamam'))) grupKutla(bolum); });
+        sonImza = imza();
+        return true;
+    }
+
+    /* Kutlamalar: kısa, tek seferlik; hareketi azalt açıkken hiçbiri yok */
+    function sarsil(desen) { if (navigator.vibrate) try { navigator.vibrate(desen); } catch (x) { /* yok */ } }
+
+    function zipla(el, sinif) {
+        if (!el || azHareket) return;
+        sinif = sinif || 'is-zipla';
+        el.classList.remove(sinif);
+        void el.offsetWidth;
+        el.classList.add(sinif);
+        clearTimeout(el._zz);
+        el._zz = setTimeout(function () { el.classList.remove(sinif); }, 700);
+    }
+
+    var KONFETI_RENK = ['var(--gv-r, var(--mavi))', 'var(--sari)', 'var(--yesil)', 'var(--mavi)', '#ec4899', 'var(--mor)'];
+    function konfeti(hedef, adet, yaricap, buyuk) {
+        if (!hedef || azHareket) return;
+        var k = document.createElement('span');
+        k.className = 'gv-konfeti' + (buyuk ? ' gv-konfeti--buyuk' : '');
+        k.setAttribute('aria-hidden', 'true');
+        var h = '';
+        for (var i = 0; i < adet; i++) {
+            var aci = (i / adet) * Math.PI * 2 + (Math.random() - 0.5) * 0.6;
+            var uz = yaricap * (0.65 + Math.random() * 0.55);
+            h += '<i style="--x:' + (Math.cos(aci) * uz).toFixed(1) + 'px;--y:' + (Math.sin(aci) * uz - (buyuk ? 10 : 4)).toFixed(1) + 'px;--r:' +
+                Math.round((Math.random() - 0.5) * 540) + 'deg;--g:' + Math.round(Math.random() * 60) + 'ms;--c:' + KONFETI_RENK[i % KONFETI_RENK.length] + '"></i>';
+        }
+        k.innerHTML = h;
+        hedef.appendChild(k);
+        setTimeout(function () { if (k.parentNode) k.parentNode.removeChild(k); }, buyuk ? 1300 : 900);
+    }
+
+    function satirKutla(satir) {
+        sarsil([12, 40, 16]);
+        if (azHareket) return;
+        satir.classList.remove('is-kutla');
+        void satir.offsetWidth;
+        satir.classList.add('is-kutla');
+        konfeti(satir.querySelector('.gv-tik'), 12, 34);
+        clearTimeout(satir._kz);
+        satir._kz = setTimeout(function () { satir.classList.remove('is-kutla'); }, 900);
+    }
+
+    function cipKutla(cip) {
+        sarsil([12, 40, 16]);
+        zipla(cip);
+        konfeti(cip, 10, 30);
+    }
+
+    function grupKutla(bolum) {
+        sarsil([18, 50, 18, 50, 30]);
+        if (azHareket) return;
+        bolum.classList.remove('is-kutla');
+        void bolum.offsetWidth;
+        bolum.classList.add('is-kutla');
+        konfeti(bolum.querySelector('.gv-grup__ikon'), 16, 46);
+        clearTimeout(bolum._kz);
+        bolum._kz = setTimeout(function () { bolum.classList.remove('is-kutla'); }, 1100);
+    }
+
+    function buyukKutlama(ust) {
+        sarsil([30, 60, 30, 60, 80]);
+        if (azHareket) return;
+        ust.classList.remove('is-kutla');
+        void ust.offsetWidth;
+        ust.classList.add('is-kutla');
+        konfeti(ust.querySelector('.gv-ust__halka'), 28, 90, true);
+        clearTimeout(ust._kz);
+        ust._kz = setTimeout(function () { ust.classList.remove('is-kutla'); }, 1400);
+    }
+
     function imza() {
         var bugun = isGunu();
         return JSON.stringify([D.gorevler, D.gunler.length, D.gunler.filter(function (s) { return s.gun === bugun; }), bugun, D.yerel, D.aktarimBekliyor ? D.aktarimBekliyor.gorevler.length : 0]);
@@ -864,8 +1084,8 @@
     function iskelet() {
         var satir = '<div class="gv-satir gv-satir--iskelet"><span class="gv-tik"><span class="gv-tik__kutu yrd-iskelet"></span></span><span class="gv-karo yrd-iskelet"></span>' +
             '<div class="gv-satir__metin"><span class="yrd-iskelet" style="width:70%;height:16px"></span><span class="yrd-iskelet" style="width:64px;height:16px"></span></div></div>';
-        return '<section class="gv-ust"><div class="gv-ust__halka"><span class="yrd-iskelet gv-iskelet-halka"></span></div>' +
-            '<div class="gv-ust__metin"><span class="yrd-iskelet" style="width:120px;height:18px"></span><span class="yrd-iskelet" style="width:200px;max-width:100%;height:12px"></span></div></section>' +
+        return '<section class="gv-ust"><div class="gv-ust__ana"><div class="gv-ust__halka"><span class="yrd-iskelet gv-iskelet-halka"></span></div>' +
+            '<div class="gv-ust__metin"><span class="yrd-iskelet" style="width:96px;height:12px"></span><span class="yrd-iskelet" style="width:140px;height:20px"></span><span class="yrd-iskelet" style="width:180px;max-width:100%;height:12px"></span></div></div></section>' +
             '<section class="gv-grup"><div class="gv-grup__liste">' + satir + satir + satir + satir + '</div></section>';
     }
 
@@ -1191,15 +1411,14 @@
         if (eylem === 'tik') {
             var s = gunSatiri(g.id, bugun, '');
             var yeni = !(s && s.yapildi);
-            if (yeni) sonTiklanan = g.id;
-            gunAyarla(g.id, '', { yapildi: yeni });
-            titres();
+            gunAyarla(g.id, '', { yapildi: yeni }, yeni ? g.id : null);
+            if (!yeni) titres();
         } else if (eylem === 'oge') {
             var oge = b.getAttribute('data-oge');
             var so = gunSatiri(g.id, bugun, oge);
-            if (!(so && so.yapildi)) sonTiklanan = g.id;
-            gunAyarla(g.id, oge, { yapildi: !(so && so.yapildi) });
-            titres();
+            var acik = !(so && so.yapildi);
+            gunAyarla(g.id, oge, { yapildi: acik }, acik ? g.id + '|' + oge : null);
+            if (!acik) titres();
         } else if (eylem === 'cikar') {
             var d = durum(g, bugun);
             if (d.eklendi) gunAyarla(g.id, '', { eklendi: false });
@@ -1236,7 +1455,7 @@
             } else {
                 await yukleHafif();
             }
-            if (imza() !== sonImza) ciz(true);
+            if (imza() !== sonImza && (gorunum !== 'bugun' || !yerindeGuncelle(null))) ciz(true);
         } catch (e) { /* ağ: eldeki liste kalır */ } finally {
             tazeleniyor = false;
         }
@@ -1292,6 +1511,9 @@
         global.addEventListener('focus', function () { tazele(); });
         global.addEventListener('pageshow', function (e) { if (e.persisted) tazele(true); });
         global.addEventListener('online', function () { tazele(true); });
+        // Sekme gizlenirken ya da kapanırken bekleyen tikler hemen gider
+        document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'hidden') yazmalariGonder(); });
+        global.addEventListener('pagehide', yazmalariGonder);
     }
 
     global.JBDepoGorev = { kur: kur, _ic: { durum: durum, tur: tur, planIleri: planIleri, isGunu: isGunu, D: D, pencereAc: pencereAc } };
