@@ -133,7 +133,7 @@
         ['donuk', 'La Lorraine Donuk Fırın Ürünlerini düzgün diz', 1, false, [C('5f36a342feba7929034a1562_tr_1610972748444.jpeg'), C('5f36a3bfe734034466325225_tr_1610972810517.jpeg')]],
         ['donuk', 'Feast ve SuperFresh Donuk Ürünlerini düzgün diz', 2, false, [G('e840b9db-2028-4ec9-afe6-7656fd7a8176.jpg'), G('204f9ff6-652b-4f01-8012-16ccb0d86f42.jpg'), G('7822a058-aa83-4a65-8b55-62cda1aaa6d0.jpg')]],
         ['temizlik', 'Gece çıkmadan Paspas at', 1, false, [], 'paspas'],
-        ['temizlik', 'Rafları sil ve temizle', 7, false, [], 'raf']
+        ['temizlik', 'Rafları sil ve temizle', 1, true, [], 'raf']
     ];
 
     /* İlk sürümün adları: görseli olmayan eski kayıt yeni ada ve görsele geçer */
@@ -286,7 +286,22 @@
             g.cizim = b[5] || '';
             degisen.push(g);
         });
+        // Raf temizliği sırayla yapılan işe döndü (buz çözme gibi): her gün bir raf.
+        // Yalnız hiç dokunulmamış eski hali (haftalık, sırasız, rafsız) geçer.
+        D.gorevler.forEach(function (g) {
+            if (g.ad === 'Rafları sil ve temizle' && !g.sirali && !g.ogeler.length && g.siklik === 7) {
+                g.sirali = true;
+                g.siklik = 1;
+                if (degisen.indexOf(g) === -1) degisen.push(g);
+            }
+        });
         return degisen;
+    }
+
+    /* Sırayla yapılan işin öğesine ne denir: raf işinde "Raf", gerisinde "Dolap" */
+    function ogeAdi(g) {
+        var raf = g.cizim === 'raf' || /\braf/i.test(sade(g.ad));
+        return raf ? { tek: 'Raf', cok: 'Raflar', belirtme: 'Rafları', ornek: 'Örn. Atıştırmalık Rafı 1' } : { tek: 'Dolap', cok: 'Dolaplar', belirtme: 'Dolapları', ornek: 'Örn. Dondurma Dolabı 1' };
     }
 
     async function yukle() {
@@ -655,7 +670,7 @@
 
     function turHtml(g, bugun) {
         if (!g.ogeler.length) {
-            return '<button type="button" class="gv-cip gv-cip--bos" data-eylem="duzenle-ac">' + svg(IKON_ARTI) + 'Dolapları ekle</button>';
+            return '<button type="button" class="gv-cip gv-cip--bos" data-eylem="duzenle-ac">' + svg(IKON_ARTI) + ogeAdi(g).belirtme + ' ekle</button>';
         }
         var t = tur(g, bugun);
         var kalan = g.ogeler.filter(function (o) { return !t.biten[o]; });
@@ -711,11 +726,11 @@
             disarda.map(function (x) {
                 var g = x.g;
                 var kalan = fark(x.d.sonraki, bugun);
-                var ne = x.d.ertelendi ? 'Bugünden çıkarıldı' : (g.sirali && !g.ogeler.length) ? 'Dolap eklenmedi' : kalan <= 1 ? 'Yarın' : kalan + ' gün sonra';
+                var ne = x.d.ertelendi ? 'Bugünden çıkarıldı' : (g.sirali && !g.ogeler.length) ? ogeAdi(g).tek + ' eklenmedi' : kalan <= 1 ? 'Yarın' : kalan + ' gün sonra';
                 var dugme = x.d.ertelendi
                     ? '<button type="button" class="gv-kucuk-dugme" data-eylem="geri-al">' + svg(IKON_GERI) + 'Geri al</button>'
                     : (g.sirali && !g.ogeler.length)
-                        ? '<button type="button" class="gv-kucuk-dugme" data-eylem="duzenle-ac">' + svg(IKON_ARTI) + 'Dolap</button>'
+                        ? '<button type="button" class="gv-kucuk-dugme" data-eylem="duzenle-ac">' + svg(IKON_ARTI) + ogeAdi(g).tek + '</button>'
                         : '<button type="button" class="gv-kucuk-dugme" data-eylem="ekle">' + svg(IKON_ARTI) + 'Bugüne</button>';
                 return '<div class="gv-sira gv--' + grupBul(g.grup).renk + '" data-id="' + g.id + '">' + karo(g, true) +
                     '<span class="gv-sira__metin"><span class="gv-ad">' + kacis(g.ad) + '</span>' +
@@ -774,7 +789,7 @@
             return '<section class="gv-grup gv--' + gr.renk + '"><header class="gv-grup__bas"><span class="gv-grup__ikon">' + svg(IKON[gr.ad] || IKON.diger) + '</span>' +
                 '<h3>' + kacis(gr.baslik) + '</h3><span class="gv-grup__sayi">' + l.length + ' iş</span></header>' +
                 '<div class="gv-grup__liste">' + l.map(function (g) {
-                    var alt = siklikYazi(g.siklik) + (g.sirali ? ' · Sırayla, ' + g.ogeler.length + ' dolap' : '');
+                    var alt = siklikYazi(g.siklik) + (g.sirali ? ' · Sırayla, ' + g.ogeler.length + ' ' + ogeAdi(g).tek.toLocaleLowerCase('tr') : '');
                     return '<button type="button" class="gv-duzen" data-id="' + g.id + '" data-eylem="duzenle-ac">' + karo(g) +
                         '<span class="gv-duzen__metin"><span class="gv-ad">' + kacis(g.ad) + '</span><span class="gv-sira__alt">' + kacis(alt) + '</span></span>' +
                         svg(IKON_OK, 'gv-duzen__ok') + '</button>';
@@ -919,11 +934,11 @@
             return '<span class="gvp-resim"><img src="' + kacis(u) + '" alt="" width="56" height="56" decoding="async"><button type="button" data-p="resim-cikar" data-i="' + i + '" aria-label="Görseli kaldır">' + svg(IKON_X) + '</button></span>';
         }).join('') + (t.gorseller.length < 3 ? '<span class="gvp-resim gvp-resim--bos" aria-hidden="true">' + svg(IKON_RESIM) + '</span>' : '');
         var dolaplar = t.sirali
-            ? '<div class="gvp-alan"><span class="gvp-etiket">Dolaplar <small>Her gün biri yapılır, tiklenen tur bitene kadar gösterilmez</small></span>' +
+            ? '<div class="gvp-alan"><span class="gvp-etiket">' + ogeAdi(t).cok + ' <small>Her gün biri yapılır, tiklenen tur bitene kadar gösterilmez</small></span>' +
               (t.ogeler.length ? '<div class="gv-ogeler">' + t.ogeler.map(function (o, i) {
                   return '<span class="gv-cip gv-cip--duzen">' + kacis(o) + '<button type="button" data-p="oge-sil" data-i="' + i + '" aria-label="' + kacis(o) + ' sil">' + svg(IKON_X) + '</button></span>';
               }).join('') + '</div>' : '') +
-              '<div class="gvp-satir"><input class="gv-girdi gvp-oge-girdi" maxlength="80" placeholder="Örn. Dondurma Dolabı 1" autocomplete="off" enterkeyhint="done">' +
+              '<div class="gvp-satir"><input class="gv-girdi gvp-oge-girdi" maxlength="80" placeholder="' + ogeAdi(t).ornek + '" autocomplete="off" enterkeyhint="done">' +
               '<button type="button" class="gv-kucuk-dugme" data-p="oge-ekle">' + svg(IKON_ARTI) + 'Ekle</button></div></div>'
             : '';
         return '<div class="gvp-onizleme gv--' + grupBul(t.grup).renk + '">' + karo(t) +
@@ -936,7 +951,7 @@
             '<label class="gvp-ara">' + svg(IKON_ARA) + '<input class="gvp-ara__girdi" placeholder="Üründen görsel ara: Örn. Kefir" autocomplete="off" enterkeyhint="search" aria-label="Ürün görseli ara"></label>' +
             '<div class="gvp-sonuclar" aria-live="polite"></div>' +
             secimDugmeleri('cizim', cizimler, t.cizim, true) + '</div>' +
-            '<div class="gvp-alan gvp-alan--yatay"><span class="gvp-etiket">Sırayla Yapılan İş <small>Donuk dolaplar gibi, her gün biri</small></span>' +
+            '<div class="gvp-alan gvp-alan--yatay"><span class="gvp-etiket">Sırayla Yapılan İş <small>Dolaplar ya da raflar gibi, her gün biri</small></span>' +
             '<button type="button" role="switch" class="gvp-anahtar" data-p="sirali" aria-checked="' + !!t.sirali + '" aria-label="Sırayla yapılan iş"><i></i></button></div>' +
             dolaplar;
     }
@@ -1096,7 +1111,7 @@
             return;
         }
         if (t.sirali && !t.ogeler.length) {
-            bildir('Sırayla yapılan işe en az bir dolap ekle.', 'uyari');
+            bildir('Sırayla yapılan işe en az bir ' + ogeAdi(t).tek.toLocaleLowerCase('tr') + ' ekle.', 'uyari');
             var o = P.kok.querySelector('.gvp-oge-girdi');
             if (o) o.focus();
             return;
