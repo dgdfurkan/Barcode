@@ -178,7 +178,8 @@ Arayüze dokunan her işte üçü sırayla kullanılır:
   başlatılacak (SQL yok). Red ve iptal 2 dk toplanıp (en çok 6 dk) zamanlı raporun red kartıyla, hasar fotoğraflarıyla
   gidiyor; kart çizilemezse eski tek tek mesaj. Bekleyen kuyruk bellekte: servis tam o 2 dk içinde yeniden başlarsa o redler gitmez.
 - Depo Görevleri (Yardımcılar > Görevler): `sql_files/depo_gorev.sql` çalıştırılacak (SQL yalnız; VPS kodu yok, PostgREST).
-  Çalışana kadar sekme açılır ama görevler ve tikler yalnız o cihazda kalır ("Sunucu güncellemesi bekleniyor" yazar).
+  Çalışana kadar görevler ve tikler yalnız o cihazda kalır. SQL çalışınca cihazdaki liste kendiliğinden sunucuya
+  geçer; sunucuda başka cihazdan liste varsa "hangisi kalsın" diye sorar. Kullanıcı PC'de düzenledi: önce PC'den açılmalı.
 - `sw.js` (kök) sürümlü dosyaları telefonda saklıyor. Bir sorun olursa dosyanın başındaki "KAPATMAK
   GEREKİRSE" bloğu yayınlanır.
 - VPS'te apt upgrade + reboot bekliyor.

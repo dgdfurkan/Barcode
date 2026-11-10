@@ -285,7 +285,8 @@
 
     async function yukle() {
         var d = db();
-        if (!d) D.yerel = true;
+        // Her yoklamada sunucu yeniden denenir: tablo kurulduğu an yerel liste aktarılır
+        D.yerel = !d;
         if (!D.yerel) {
             var sinir = gunEkle(isGunu(), -GECMIS_GUN);
             var r = await Promise.all([
@@ -301,6 +302,17 @@
                 D.gunler = (r[1].data || []).map(function (s) {
                     return { gorev_id: s.gorev_id, gun: String(s.gun).slice(0, 10), oge: s.oge || '', yapildi: !!s.yapildi, eklendi: !!s.eklendi, ertelendi: !!s.ertelendi };
                 });
+                // Sunucu tablosu yokken bu cihazda tutulan liste: sunucu boşsa hemen aktarılır,
+                // doluysa kullanıcıya sorulur (bkz. aktarimSeridi)
+                var yerelKopya = jsonOku(yerelAnahtar());
+                D.aktarimBekliyor = null;
+                if (yerelKopya && yerelKopya.gorevler.length) {
+                    if (!D.gorevler.length) {
+                        await yereliSunucuyaYaz(d, yerelKopya, false);
+                        return;
+                    }
+                    D.aktarimBekliyor = yerelKopya;
+                }
                 if (!D.gorevler.length && !D.gunler.length && !D.tohumlandi) {
                     D.tohumlandi = true;
                     var ilk = baslangicListesi();
@@ -324,6 +336,36 @@
             yerelYaz();
         }
         D.yuklendi = true;
+    }
+
+    /*
+     * Bu cihazın listesini sunucuya yazar. degistir: sunucudaki liste silinip
+     * yerine bu cihazdaki konur (kullanıcı seçti). Başarılı olunca yerel kopya silinir.
+     */
+    async function yereliSunucuyaYaz(d, kopya, degistir) {
+        var gorevler = kopya.gorevler.map(satirTemiz);
+        var kimlikler = {};
+        gorevler.forEach(function (g) { kimlikler[g.id] = true; });
+        var sinir = gunEkle(isGunu(), -GECMIS_GUN);
+        var gunler = (kopya.gunler || []).filter(function (s) { return kimlikler[s.gorev_id] && s.gun >= sinir; });
+        if (degistir) {
+            var sil = await d.from('depo_gorev').delete().eq('username', D.kullanici);
+            if (sil && sil.error) throw sil.error;
+        }
+        var r1 = await d.from('depo_gorev').upsert(gorevler.map(function (g) { return Object.assign({ username: D.kullanici }, g); }), { onConflict: 'username,id' });
+        if (r1 && r1.error) throw r1.error;
+        if (gunler.length) {
+            var r2 = await d.from('depo_gorev_gun').upsert(gunler.map(function (s) {
+                return { username: D.kullanici, gorev_id: s.gorev_id, gun: s.gun, oge: s.oge || '', yapildi: !!s.yapildi, eklendi: !!s.eklendi, ertelendi: !!s.ertelendi };
+            }), { onConflict: 'username,gorev_id,gun,oge' });
+            if (r2 && r2.error) throw r2.error;
+        }
+        try { localStorage.removeItem(yerelAnahtar()); } catch (e) { /* yok */ }
+        D.gorevler = gorevler;
+        D.gunler = gunler.map(function (s) { return { gorev_id: s.gorev_id, gun: s.gun, oge: s.oge || '', yapildi: !!s.yapildi, eklendi: !!s.eklendi, ertelendi: !!s.ertelendi }; });
+        D.aktarimBekliyor = null;
+        D.yuklendi = true;
+        onbellekYaz();
     }
 
     /* Yazmalar iyimser: ekran hemen değişir, sunucu arkada; düşerse geri alınır */
@@ -563,7 +605,7 @@
             '<span class="gv-ust__sayi">' + (tamam ? svg('<path d="m6.5 12.5 3.8 3.8L18 8.5"/>', 'gv-ust__tamam') : '<b>' + biten + '</b><small>/' + toplam + '</small>') + '</span></div>' +
             '<div class="gv-ust__metin"><strong>' + (tamam ? 'Bugünün İşleri Tamam' : toplam ? (toplam - biten) + ' iş kaldı' : 'Bugün iş yok') + '</strong>' +
             '<span>' + kacis(gunAdi(bugun)) + ' · 08:00\'de yenilenir</span>' +
-            (D.yerel ? '<span class="gv-ust__uyari">' + svg('<circle cx="12" cy="12" r="9"/><path d="M12 7.5v5M12 16v.5"/>') + 'Sunucu güncellemesi bekleniyor, işaretler bu cihazda.</span>' : '') +
+            (D.yerel ? '<span class="gv-ust__uyari">' + svg('<circle cx="12" cy="12" r="9"/><path d="M12 7.5v5M12 16v.5"/>') + 'Sunucuda görev tablosu henüz yok: liste ve tikler şimdilik yalnız bu cihazda. Tablo kurulunca bu cihazdaki liste kendiliğinden sunucuya geçer.</span>' : '') +
             '</div>' +
             (seritler ? '<div class="gv-ust__seritler">' + seritler + '</div>' : '') +
             '</section>';
@@ -645,7 +687,18 @@
                     '<span class="gv-sira__alt"><i class="gv-nokta"></i>' + kacis(ne) + ' · ' + kacis(siklikYazi(g.siklik, true)) + '</span></span>' + dugme + '</div>';
             }).join('') + '</div></section>' : '';
 
-        return ustKart(bugun, liste) + bos + gruplar + sirada;
+        return aktarimSeridi() + ustKart(bugun, liste) + bos + gruplar + sirada;
+    }
+
+    /* Sunucuda başka cihazdan gelmiş liste var, bu cihazda da aktarılmamış liste: hangisi kalsın */
+    function aktarimSeridi() {
+        var k = D.aktarimBekliyor;
+        if (!k) return '';
+        return '<section class="gv-aktar">' + svg('<path d="M4 7h11M11 3l4 4-4 4M20 17H9M13 13l-4 4 4 4"/>', 'gv-aktar__ikon') +
+            '<div class="gv-aktar__metin"><strong>Bu cihazda ayrı bir liste var</strong>' +
+            '<span>Sunucu güncellemesinden önce bu cihazda ' + k.gorevler.length + ' işlik bir liste düzenlenmiş. Hangisi kalsın?</span></div>' +
+            '<div class="gv-aktar__dugmeler"><button type="button" class="gv-ana-dugme" data-eylem="aktar-yerel">Bu Cihazdakini Kullan</button>' +
+            '<button type="button" class="gv-kucuk-dugme" data-eylem="aktar-sunucu">Sunucudakini Kullan</button></div></section>';
     }
 
     function planHtml() {
@@ -755,7 +808,7 @@
 
     function imza() {
         var bugun = isGunu();
-        return JSON.stringify([D.gorevler, D.gunler.length, D.gunler.filter(function (s) { return s.gun === bugun; }), bugun, D.yerel]);
+        return JSON.stringify([D.gorevler, D.gunler.length, D.gunler.filter(function (s) { return s.gun === bugun; }), bugun, D.yerel, D.aktarimBekliyor ? D.aktarimBekliyor.gorevler.length : 0]);
     }
 
     function iskelet() {
@@ -1066,6 +1119,23 @@
         var bugun = isGunu();
         if (eylem === 'plan-yon') { planYon = b.getAttribute('data-yon'); ciz(); return; }
         if (eylem === 'yeni-ac') { pencereAc(null); return; }
+        if (eylem === 'aktar-yerel' && D.aktarimBekliyor) {
+            b.disabled = true;
+            yereliSunucuyaYaz(db(), D.aktarimBekliyor, true).then(function () {
+                ciz();
+                bildir('Bu cihazdaki liste sunucuya aktarıldı; bütün cihazlar bunu görecek.', 'basari');
+            }, function () {
+                b.disabled = false;
+                bildir('Aktarılamadı, bağlantıyı kontrol et.', 'hata');
+            });
+            return;
+        }
+        if (eylem === 'aktar-sunucu' && D.aktarimBekliyor) {
+            try { localStorage.removeItem(yerelAnahtar()); } catch (x) { /* yok */ }
+            D.aktarimBekliyor = null;
+            ciz();
+            return;
+        }
         if (eylem === 'duzenle-ac') { pencereAc(g); return; }
         if (!g) return;
         if (eylem === 'tik') {

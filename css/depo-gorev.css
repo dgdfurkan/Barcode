@@ -92,6 +92,16 @@
 .gv-ust__seritler { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 24px; padding-top: 16px; border-top: 1px solid var(--cizgi); }
 .gv-iskelet-halka { width: 80px; height: 80px; border-radius: 999px; }
 
+/* Aktarım şeridi: bu cihazda sunucuya geçmemiş liste */
+.gv-aktar { display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: 12px; padding: 16px; border-radius: 16px; background: var(--sari-50); border: 1px solid var(--sari-cizgi); }
+.gv-aktar__ikon { width: 40px; height: 40px; padding: 10px; border-radius: 12px; background: var(--yuzey); color: #b45309; }
+.gv-aktar__metin { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.gv-aktar__metin strong { font-size: 15px; line-height: 20px; color: var(--yazi); }
+.gv-aktar__metin span { font-size: 12px; line-height: 18px; color: var(--yazi-orta); }
+.gv-aktar__dugmeler { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 8px; }
+.gv-aktar__dugmeler button { flex: 1 1 160px; justify-content: center; }
+.gv-aktar__dugmeler button:disabled { opacity: 0.6; cursor: wait; }
+
 /* Kutlama: hepsi bitince bir kez, halkanın çevresine parçacık */
 .gv-kutlama { position: absolute; left: 50%; top: 50%; width: 0; height: 0; pointer-events: none; }
 .gv-kutlama i { position: absolute; left: -4px; top: -4px; width: 8px; height: 8px; border-radius: 999px; background: var(--yesil); opacity: 0;
