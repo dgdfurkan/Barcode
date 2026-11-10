@@ -52,7 +52,7 @@
 .gv-satir:hover .gv-karo__kat--1, .gv-duzen:hover .gv-karo__kat--1 { transform: translate(5px, -4px) rotate(8deg); }
 .gv-satir:hover .gv-karo__kat--2, .gv-duzen:hover .gv-karo__kat--2 { transform: translate(9px, -7px) rotate(15deg); }
 .gv-karo { transition: opacity var(--motion-normal) var(--motion-ease-standard); }
-.gv-satir.is-tamam .gv-karo { opacity: 0.55; }
+.gv-satir.is-tamam .gv-karo { opacity: 0.75; }
 
 /* Çizimler: iki ton. c-c çizgi, c-d açık dolgu, c-d2 ana renk dolgu, c-p pırıltı */
 .gv-cizim, .gvp-mini-cizim, .gv-bos__cizim { width: 40px; height: 40px; }
@@ -133,12 +133,14 @@
 .gv-satir { position: relative; display: flex; align-items: center; gap: 8px; min-height: 72px; padding: 8px 4px; border-top: 1px solid var(--cizgi);
     transition: background-color var(--motion-micro) var(--motion-ease-standard); }
 .gv-satir[data-satir-tik] { cursor: pointer; -webkit-tap-highlight-color: transparent; }
-.gv-satir[data-satir-tik]:hover { background: color-mix(in srgb, var(--gv-z) 40%, var(--yuzey)); }
+/* Dokunmada metin seçilip satır maviye boyanmasın */
+.gv-satir, .gv-cip, .gv-tik, .gv-sira, .gv-duzen { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+@media (hover: hover) { .gv-satir[data-satir-tik]:hover { background: color-mix(in srgb, var(--gv-z) 40%, var(--yuzey)); } }
 .gv-satir:has(.gv-tur) { align-items: flex-start; }
 .gv-satir:has(.gv-tur) .gv-karo { margin-top: 4px; }
 .gv-satir__metin { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; padding: 4px 0; }
 .gv-ad { font-size: 15px; line-height: 20px; font-weight: 600; color: var(--yazi); overflow-wrap: anywhere; transition: color var(--motion-micro) var(--motion-ease-standard); }
-.gv-satir.is-tamam .gv-ad { color: var(--soluk); text-decoration: line-through; text-decoration-color: var(--cizgi-sert); text-decoration-thickness: 1.5px; }
+.gv-satir.is-tamam .gv-ad { color: var(--sonuk); text-decoration: line-through; text-decoration-color: var(--cizgi-sert); text-decoration-thickness: 1.5px; }
 
 .gv-tik { flex: none; width: 44px; height: 44px; padding: 0; border: 0; background: transparent; display: grid; place-items: center; cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .gv-satir:has(.gv-tur) .gv-tik { margin-top: 6px; }
@@ -157,11 +159,11 @@
 /* Az önce tiklenen: kutu bir kez zıplar, işaret çizilir, satıra renk dalgası */
 .gv-satir.is-yeni .gv-tik__kutu { animation: gv-pop var(--motion-panel) var(--motion-ease-out) both; }
 .gv-satir.is-yeni .gv-tik__isaret { animation: gv-isaret var(--motion-normal) var(--motion-ease-out) 60ms both; }
-.gv-satir.is-yeni::after { content: ''; position: absolute; inset: 0; background: var(--gv-z); pointer-events: none; animation: gv-dalga 420ms var(--motion-ease-out) both; }
+.gv-satir.is-yeni::after { content: ''; position: absolute; inset: 0; background: var(--gv-z); opacity: 0; pointer-events: none; animation: gv-dalga 420ms var(--motion-ease-out) both; }
 .gv-satir.is-yeni .gv-cip.is-tamam { animation: gv-pop var(--motion-panel) var(--motion-ease-out) both; }
 @keyframes gv-pop { 0% { transform: scale(0.7); } 60% { transform: scale(1.12); } 100% { transform: scale(1); } }
 @keyframes gv-isaret { from { opacity: 0; transform: scale(0.3) rotate(-20deg); } to { opacity: 1; transform: none; } }
-@keyframes gv-dalga { from { opacity: 0.9; } to { opacity: 0; } }
+@keyframes gv-dalga { from { opacity: 0.6; } to { opacity: 0; } }
 
 .gv-etiketler { display: flex; flex-wrap: wrap; gap: 4px; }
 .gv-hap { display: inline-flex; align-items: center; height: 20px; padding: 0 8px; border-radius: 999px; background: var(--kagit); font-size: 11px; font-weight: 700; color: var(--yazi-orta); white-space: nowrap; }
@@ -408,6 +410,7 @@ html.gvp-acik { overflow: hidden; }
     .gv-govde.is-giris > *, .gv-kok .c-p, .gv-kutlama i, .gv-ust__tamam,
     .gv-satir.is-yeni .gv-tik__kutu, .gv-satir.is-yeni .gv-tik__isaret, .gv-satir.is-yeni::after, .gv-satir.is-yeni .gv-cip.is-tamam, .gvp-ad.is-hata { animation: none; }
     .gv-kok .c-p { opacity: 1; }
+    .gv-satir.is-yeni::after { display: none; }
     .gv-segment button, .gv-tik__kutu, .gv-cip, .gv-serit__cubuk i, .gv-grup__cubuk i, .gv-halka__dolu, .gv-karo__kat, .gv-karo,
     .gv-satir, .gv-ad, .gv-ikon-dugme, .gv-kucuk-dugme, .gv-girdi, .gv-tur__parca i, .gvp__perde, .gvp__pano, .gvp-secim__dugme,
     .gvp-anahtar, .gvp-anahtar i, .gvp-sonuc, .gvp-sonuc__tik, .gv-yeni-dugme, .gv-duzen, .gv-ana-dugme { transition: none !important; }

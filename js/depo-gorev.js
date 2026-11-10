@@ -40,7 +40,13 @@
 
     var GUN_BASI = 8;
     var GECMIS_GUN = 90;
-    var YOKLAMA_MS = 30 * 1000;
+    /* Cihazlar arası eşitleme: 4 sn'de bir yalnız bugünün tikleri ve iş listesi (küçük),
+       dakikada bir 90 günlük tam okuma. Pencereye dönülünce hemen sorulur. */
+    var YOKLAMA_MS = 4 * 1000;
+    var TAM_OKUMA_MS = 60 * 1000;
+    /* Kendi yazmamız bitmeden ve bittikten sonraki bu süre içinde gelen okuma ekrana basılmaz:
+       tik atılıp sunucuya varmadan eski hali okunursa tik bir an kaybolup geri gelirdi */
+    var YAZMA_KORUMA_MS = 1500;
     var KATALOG = '../veri/temp_products.js?v=20261030a';
 
     var IKON = {
@@ -371,6 +377,7 @@
     /* Yazmalar iyimser: ekran hemen değişir, sunucu arkada; düşerse geri alınır */
     async function sunucuya(is, geriAl) {
         if (D.yerel) { yerelYaz(); return true; }
+        D.yaziyor = (D.yaziyor || 0) + 1;
         try {
             var r = await is(db());
             if (r && r.error) throw r.error;
@@ -386,7 +393,35 @@
             bildir('Kaydedilemedi, bağlantıyı kontrol et.', 'hata');
             ciz();
             return false;
+        } finally {
+            D.yaziyor -= 1;
+            D.sonYazma = Date.now();
         }
+    }
+
+    function yaziyorMu() { return (D.yaziyor || 0) > 0 || Date.now() - (D.sonYazma || 0) < YAZMA_KORUMA_MS; }
+
+    /* Hafif okuma: iş listesi + bugünün satırları. Eski günler yerinde kalır. */
+    async function yukleHafif() {
+        var d = db();
+        if (!d || D.yerel || !D.yuklendi) return yukle();
+        var bugun = isGunu();
+        var r = await Promise.all([
+            d.from('depo_gorev').select('id,ad,grup,siklik,sirali,ogeler,gorseller,cizim,sira').eq('username', D.kullanici).order('sira', { ascending: true }),
+            d.from('depo_gorev_gun').select('gorev_id,gun,oge,yapildi,eklendi,ertelendi').eq('username', D.kullanici).eq('gun', bugun).limit(2000)
+        ]);
+        if (r[0].error || r[1].error) {
+            if (tabloYokMu(r[0].error) || tabloYokMu(r[1].error)) return yukle();
+            throw r[0].error || r[1].error;
+        }
+        if (yaziyorMu()) return;
+        D.gorevler = (r[0].data || []).map(satirTemiz);
+        var kimlikler = {};
+        D.gorevler.forEach(function (g) { kimlikler[g.id] = true; });
+        D.gunler = D.gunler.filter(function (s) { return s.gun !== bugun && kimlikler[s.gorev_id]; }).concat((r[1].data || []).map(function (s) {
+            return { gorev_id: s.gorev_id, gun: String(s.gun).slice(0, 10), oge: s.oge || '', yapildi: !!s.yapildi, eklendi: !!s.eklendi, ertelendi: !!s.ertelendi };
+        }));
+        onbellekYaz();
     }
 
     function gunSatiri(gorevId, gun, oge) {
@@ -1169,13 +1204,27 @@
     var kurulu = false;
     var sonGun = '';
 
-    async function tazele() {
+    var tazeleniyor = false;
+    var sonTam = 0;
+    async function tazele(tam) {
         if (!kok || document.visibilityState !== 'visible' || kok.closest('[hidden]')) return;
         if (P.kok && !P.kok.hidden) return;
+        if (tazeleniyor || yaziyorMu()) return;
+        tazeleniyor = true;
         try {
-            await yukle();
+            if (tam === true || Date.now() - sonTam > TAM_OKUMA_MS) {
+                var oncekiGorevler = D.gorevler, oncekiGunler = D.gunler;
+                await yukle();
+                sonTam = Date.now();
+                // Okuma sürerken tik atıldıysa onun hali korunur
+                if (yaziyorMu()) { D.gorevler = oncekiGorevler; D.gunler = oncekiGunler; return; }
+            } else {
+                await yukleHafif();
+            }
             if (imza() !== sonImza) ciz(true);
-        } catch (e) { /* ağ: eldeki liste kalır */ }
+        } catch (e) { /* ağ: eldeki liste kalır */ } finally {
+            tazeleniyor = false;
+        }
     }
 
     async function kur(hedef, kullanici) {
@@ -1221,8 +1270,13 @@
         setInterval(function () {
             if (isGunu() !== sonGun) { sonGun = isGunu(); oncekiTamam = null; ciz(); }
         }, 60 * 1000);
+        sonTam = Date.now();
         setInterval(tazele, YOKLAMA_MS);
+        // Sekmeye ya da pencereye dönülünce beklemeden (bilgisayarda pencere değiştirmek visibilitychange vermez)
         document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') tazele(); });
+        global.addEventListener('focus', function () { tazele(); });
+        global.addEventListener('pageshow', function (e) { if (e.persisted) tazele(true); });
+        global.addEventListener('online', function () { tazele(true); });
     }
 
     global.JBDepoGorev = { kur: kur, _ic: { durum: durum, tur: tur, planIleri: planIleri, isGunu: isGunu, D: D, pencereAc: pencereAc } };
