@@ -649,6 +649,55 @@
             if (!saved) localStorage.setItem('getir_settings', JSON.stringify(DEFAULT_CATEGORIES));
         } catch (e) { userSettings = DEFAULT_CATEGORIES; }
 
+        /*
+         * KATEGORİLER HESAPTA
+         * Bu liste Getir panelinin tarayıcı belleğinde duruyordu; panel belleği
+         * temizlenince (çıkış, site verisi silme) varsayılana dönüyordu. Artık
+         * Jet Barkod hesabında da saklanıyor (arka plan: JBA_AYAR_OKU / YAZ).
+         * Açılışta hesaptaki daha yeniyse o kullanılır; burada yapılan değişiklik
+         * hesaba yazılır. `getir_settings_zaman` bu cihazdaki son düzenleme anı.
+         */
+        const KATEGORI_ANAHTARI = 'hizliBulKategoriler';
+        function yerelKategoriZamani() {
+            try { return Number(localStorage.getItem('getir_settings_zaman')) || 0; } catch (e) { return 0; }
+        }
+        function kategorileriKaydet() {
+            const z = Date.now();
+            try {
+                localStorage.setItem('getir_settings', JSON.stringify(userSettings));
+                localStorage.setItem('getir_settings_zaman', String(z));
+            } catch (e) { /* yer yok */ }
+            try {
+                chrome.runtime.sendMessage({ type: 'JBA_AYAR_YAZ', anahtar: KATEGORI_ANAHTARI, veri: userSettings, zaman: z }, () => { void chrome.runtime.lastError; });
+            } catch (e) { /* yetim bağlam */ }
+        }
+        function kategorileriHesaptanAl() {
+            try {
+                chrome.runtime.sendMessage({ type: 'JBA_AYAR_OKU', anahtar: KATEGORI_ANAHTARI }, (c) => {
+                    if (chrome.runtime.lastError || !c || !c.ok) return;
+                    const k = c.kayit;
+                    const yerelZ = yerelKategoriZamani();
+                    if (k && Array.isArray(k.veri) && k.zaman >= yerelZ) {
+                        if (JSON.stringify(k.veri) === JSON.stringify(userSettings)) return;
+                        userSettings = k.veri;
+                        try {
+                            localStorage.setItem('getir_settings', JSON.stringify(userSettings));
+                            localStorage.setItem('getir_settings_zaman', String(k.zaman));
+                        } catch (e) { /* yer yok */ }
+                        try { if (typeof renderCategories === 'function') renderCategories(); } catch (e) { /* panel kapalı */ }
+                        try { if (typeof applyUI === 'function') applyUI(); } catch (e) { /* henüz yok */ }
+                    } else if (yerelZ && (!k || yerelZ > k.zaman)) {
+                        // Bu cihazdaki düzenleme hesaptakinden yeni (ya da hesapta hiç yok): hesaba yaz
+                        chrome.runtime.sendMessage({ type: 'JBA_AYAR_YAZ', anahtar: KATEGORI_ANAHTARI, veri: userSettings, zaman: yerelZ }, () => { void chrome.runtime.lastError; });
+                    } else if (!k && localStorage.getItem('getir_settings') && JSON.stringify(userSettings) !== JSON.stringify(DEFAULT_CATEGORIES)) {
+                        // Eski kurulum: zaman yok ama özelleştirilmiş liste var; ilk kez hesaba taşı
+                        kategorileriKaydet();
+                    }
+                });
+            } catch (e) { /* yetim bağlam */ }
+        }
+        kategorileriHesaptanAl();
+
         let userToken = localStorage.getItem('getir_manual_token') || '';
         let warehouseId = '';
 
@@ -1434,7 +1483,7 @@
                     const idx = Number(editingCategoryIndex);
                     if (idx > -1) userSettings[idx] = cat;
                     else userSettings.push(cat);
-                    localStorage.setItem('getir_settings', JSON.stringify(userSettings));
+                    kategorileriKaydet();
                     duzenlemeyiBitir();
                     renderCategories();
                     applyUI();
@@ -1523,7 +1572,7 @@
             list.querySelectorAll('.del-btn').forEach(btn => {
                 btn.onclick = (e) => {
                     userSettings.splice(Number(e.currentTarget.getAttribute('data-idx')), 1);
-                    localStorage.setItem('getir_settings', JSON.stringify(userSettings));
+                    kategorileriKaydet();
                     renderCategories(); applyUI();
                 };
             });

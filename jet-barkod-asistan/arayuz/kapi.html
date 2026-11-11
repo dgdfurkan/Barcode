@@ -19,6 +19,41 @@
     <p class="bos">Durum okunuyor...</p>
   </main>
 
+  <section class="kat" id="katYontem">
+    <button type="button" class="kat__bas" aria-expanded="false" aria-controls="katYontemGovde">
+      <span class="kat__metin"><span class="ayar__ad">Pişirme Yöntemi</span><span class="kat__ozet" id="yontemOzet">Eski yöntem</span></span>
+      <svg class="kat__ok" viewBox="0 0 20 20" aria-hidden="true"><path d="m5 8 5 5 5-5"/></svg>
+    </button>
+    <div class="kat__govde" id="katYontemGovde" hidden>
+      <div class="secim" role="radiogroup" aria-label="Pişirme yöntemi" data-yontem="ad">
+        <button type="button" role="radio" data-deger="eski" aria-checked="true">Eski</button>
+        <button type="button" role="radio" data-deger="yeni" aria-checked="false">Yeni</button>
+      </div>
+      <p class="ayar__ozet" id="yontemAciklama">Pişirme panelinin acil ve kritik satırları. Bugünkü davranış.</p>
+      <div class="yontem-yeni" id="yontemYeni" hidden>
+        <p class="ses-baslik">Öneri Nasıl Takip Edilsin</p>
+        <div class="secim" role="radiogroup" aria-label="Öneri hesabı" data-yontem="hesap">
+          <button type="button" role="radio" data-deger="toplam" aria-checked="true">Gün toplamı</button>
+          <button type="button" role="radio" data-deger="dilim" aria-checked="false">Her dilim ayrı</button>
+        </div>
+        <p class="ayar__ozet" id="yontemHesapAciklama"></p>
+        <p class="ses-baslik">Saat Başında Eski Stok</p>
+        <div class="secim" role="radiogroup" aria-label="Eski stok" data-yontem="cikar">
+          <button type="button" role="radio" data-deger="kadar" aria-checked="true">Pişirilecek kadar çıkar</button>
+          <button type="button" role="radio" data-deger="hepsi" aria-checked="false">Hepsini çıkar</button>
+          <button type="button" role="radio" data-deger="yok" aria-checked="false">Çıkarma</button>
+        </div>
+        <p class="ses-baslik">Stok Bitmesin: Rafta Kaç Kalınca Pişir</p>
+        <div class="secim" role="radiogroup" aria-label="Stok eşiği" data-yontem="esik">
+          <button type="button" role="radio" data-deger="0" aria-checked="false">Bitince</button>
+          <button type="button" role="radio" data-deger="1" aria-checked="true">1 kalınca</button>
+          <button type="button" role="radio" data-deger="2" aria-checked="false">2 kalınca</button>
+        </div>
+        <p class="ayar__ozet">Pişirme hiçbir zaman öneri eksiğinden fazla istenmez; çok satan ürün eşiğe inince dilim içinde yeniden pişirilir.</p>
+      </div>
+    </div>
+  </section>
+
   <section class="ayar" aria-label="Fırın bildirimi">
     <div class="ayar__metin">
       <p class="ayar__ad">Fırın Bildirimi</p>

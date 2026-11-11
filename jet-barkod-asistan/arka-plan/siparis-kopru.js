@@ -240,6 +240,70 @@ function apiBasliklari(yetki, ekstra) {
     return h;
 }
 
+/*
+ * HESAPTA SAKLANAN ASİSTAN AYARLARI
+ * Getir panelinin kendi tarayıcı belleğinde duran ayarlar (Hızlı Bul kategorileri)
+ * panel belleği temizlenince ya da Asistan yeniden kurulunca kayboluyordu. Jet Barkod
+ * hesabında (asistan_ayar tablosu) saklanır; Asistan'da da yedeği tutulur. Tablo
+ * yoksa ya da oturum yoksa yedek döner.
+ */
+const AYAR_ANAHTAR_KALIBI = /^[a-zA-Z0-9_-]{1,60}$/;
+
+async function hesapAyariYedegi(anahtar) {
+    try {
+        const r = await chrome.storage.local.get('jbaAyarYedek');
+        const y = (r && r.jbaAyarYedek) || {};
+        return y[anahtar] || null;
+    } catch (e) { return null; }
+}
+
+async function hesapAyariYedekYaz(anahtar, kayit) {
+    try {
+        const r = await chrome.storage.local.get('jbaAyarYedek');
+        const y = (r && r.jbaAyarYedek) || {};
+        y[anahtar] = kayit;
+        await chrome.storage.local.set({ jbaAyarYedek: y });
+    } catch (e) { /* yer yok */ }
+}
+
+async function hesapAyariOku(anahtar) {
+    if (!AYAR_ANAHTAR_KALIBI.test(anahtar)) return { ok: false };
+    const yedek = await hesapAyariYedegi(anahtar);
+    const yetki = await yetkiTazele(false, false);
+    if (!yetki) return { ok: true, kayit: yedek, kaynak: 'yedek' };
+    try {
+        const r = await fetch(SIPARIS_API + '/rest/v1/asistan_ayar?select=veri,guncellendi_at&username=eq.' +
+            encodeURIComponent(yetki.username) + '&anahtar=eq.' + encodeURIComponent(anahtar), { headers: apiBasliklari(yetki) });
+        if (!r.ok) return { ok: true, kayit: yedek, kaynak: 'yedek', sunucuYok: r.status === 404 };
+        const j = await r.json();
+        const satir = Array.isArray(j) && j[0];
+        if (!satir) return { ok: true, kayit: yedek, kaynak: 'yedek' };
+        const kayit = { veri: satir.veri, zaman: Date.parse(satir.guncellendi_at) || 0 };
+        await hesapAyariYedekYaz(anahtar, kayit);
+        return { ok: true, kayit: kayit, kaynak: 'hesap' };
+    } catch (e) {
+        return { ok: true, kayit: yedek, kaynak: 'yedek' };
+    }
+}
+
+async function hesapAyariYaz(anahtar, veri, zaman) {
+    if (!AYAR_ANAHTAR_KALIBI.test(anahtar)) return { ok: false };
+    const z = Number(zaman) || Date.now();
+    await hesapAyariYedekYaz(anahtar, { veri: veri, zaman: z });
+    const yetki = await yetkiTazele(false, false);
+    if (!yetki) return { ok: true, hesap: false };
+    try {
+        const r = await fetch(SIPARIS_API + '/rest/v1/asistan_ayar?on_conflict=username,anahtar', {
+            method: 'POST',
+            headers: apiBasliklari(yetki, { Prefer: 'resolution=merge-duplicates,return=minimal' }),
+            body: JSON.stringify({ username: yetki.username, anahtar: anahtar, veri: veri, guncellendi_at: new Date(z).toISOString() })
+        });
+        return { ok: true, hesap: r.ok };
+    } catch (e) {
+        return { ok: true, hesap: false };
+    }
+}
+
 let teslimatSutunuYok = false;
 
 function ordersYaz(yetki, govde) {
@@ -819,6 +883,16 @@ chrome.runtime.onMessage.addListener((istek, gonderen, cevapla) => {
             }
             cevapla({ ok: ok });
         });
+        return true;
+    }
+
+    // Asistan ayarları hesapta (sql_files/asistan_ayar.sql): Hızlı Bul kategorileri gibi
+    if (istek.type === 'JBA_AYAR_OKU' && typeof istek.anahtar === 'string') {
+        hesapAyariOku(istek.anahtar).then(cevapla, () => cevapla({ ok: false }));
+        return true;
+    }
+    if (istek.type === 'JBA_AYAR_YAZ' && typeof istek.anahtar === 'string') {
+        hesapAyariYaz(istek.anahtar, istek.veri, istek.zaman).then(cevapla, () => cevapla({ ok: false }));
         return true;
     }
 

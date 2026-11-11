@@ -141,7 +141,8 @@
     var ETIKET = {
         'urgent-prep': 'ACİL PİŞİR', danger: 'ACİL PİŞİR', warning: 'PİŞİRME GEREKLİ', info: 'HAZIRLIK YAP',
         'ekmek-az': 'STOK AZ',
-        cikar: 'RAFTAN ÇIKAR'
+        cikar: 'RAFTAN ÇIKAR',
+        oneri: 'ÖNERİ GERİDE'
     };
 
     function kacir(t) {
@@ -183,10 +184,12 @@
                 var p = ada[u.ad];
                 if (!p) {
                     p = ada[u.ad] = { name: u.ad, imgSrc: u.gorsel || '', currentStock: 0, frozenStock: 0,
-                        recommendations: [0, 0, 0, 0], stokOkundu: false, _stokDilim: -1 };
+                        recommendations: [0, 0, 0, 0], pisenler: [0, 0, 0, 0], stokOkundu: false, _stokDilim: -1 };
                     sira.push(u.ad);
                 }
                 p.recommendations[i] = Number(u.oneri) || 0;
+                // Panelin o dilimde pişirildi saydığı adet (yeni yöntem öneriye uyumu buradan izler)
+                p.pisenler[i] = Math.max(0, Number(u.pisen) || 0);
                 var raf = rafDegeri(u);
                 // Stok önce şu anki dilimden; yoksa ilk bulunan dilimden
                 if (raf !== null && typeof u.donuk === 'number' && p._stokDilim !== suan && (!p.stokOkundu || i === suan)) {
@@ -200,26 +203,8 @@
         return sira.map(function (ad) { return ada[ad]; });
     }
 
-    /* Bildirime girenler:
-         - Donuktan pişen: pişirme panelinin ACİL (raf 0, sonraki dilime acil
-           hazırlık) ve KRİTİK (raf < hedefin dörtte biri) satırları.
-           Panel ikisini de kırmızı `danger` / `urgent-prep` olarak işaretliyor.
-         - Taze üretim ekmek: rafta EKMEK_SINIRI ve altı. */
-    function bildirimListesi(urunler, simdi) {
-        var stoklu = urunler.filter(function (p) { return p.stokOkundu; });
-        var suan = JBA.firinHesap.dilim(new Date(simdi).getHours()).index;
-        var liste = JBA.firinHesap.oneriler(stoklu, JBA.firinHesap.ayarlar(), simdi)
-            .filter(function (r) {
-                return !r.displayKind && r.amountToCook > 0 && r.frozenStock > 0 &&
-                    (r.alertLevel === 'danger' || r.alertLevel === 'urgent-prep');
-            })
-            .map(function (r) {
-                return {
-                    ad: r.name, gorsel: r.imgSrc, raf: r.currentStock, donuk: r.frozenStock,
-                    oneri: r.currentTarget, pisir: r.amountToCook, seviye: r.alertLevel,
-                    sebep: r.reason, oneriler: r.recommendations.slice(0, 4)
-                };
-            });
+    function ekmekSatirlari(stoklu, suan) {
+        var liste = [];
         stoklu.forEach(function (p) {
             if (!JBA.firinHesap.ekmekMi(p.name)) return;
             var raf = Math.max(0, Number(p.currentStock) || 0);
@@ -237,6 +222,102 @@
                 oneriler: p.recommendations.slice(0, 4)
             });
         });
+        return liste;
+    }
+
+    /*
+     * YENİ YÖNTEM (Asistan > Pişirme Yöntemi > Yeni)
+     * ------------------------------------------------------------------
+     * Fırın S/Ö puanı: Öneriye Uyum = günlük Pişirilen ÷ günlük Öneri (100'de
+     * kesilir), puan = (Stok Doğruluğu + Uyum) ÷ 2. Rafta stok varken pişirme
+     * girilmeyince az satan üründe öneri birikir, uyum düşer. Yeni yöntem iki
+     * şeyi birlikte gözetir:
+     *   1) ÖNERİ GERİDE KALMASIN. hesap 'toplam': bu dilim sonuna kadarki toplam
+     *      öneri − bugün pişirilen toplam (önden fazla pişirilen sonraki dilimi
+     *      karşılar). hesap 'dilim': bu dilimin önerisi − bu dilimde pişirilen.
+     *      Pişirme hiçbir zaman eksikten fazla değil (öneriden devasa fazla yok).
+     *   2) STOK ASLA SIFIR OLMASIN. Raf eşiğe (0/1/2) inince, bu ya da sonraki
+     *      dilimde talep varsa pişir; çok satan ürün böylece dilim içinde de
+     *      yenilenir. Panelin kendi acil satırları da buraya katılır.
+     * Eski stok: öneri eksiği varken bu dilimde henüz pişirme yoksa raftakiler
+     * önceki dilimden kalmadır; ayara göre pişirilecek kadarı, hepsi ya da hiçbiri
+     * çıkarılır.
+     */
+    function yeniYontemListesi(stoklu, simdi, suan) {
+        var y = yontem;
+        var sonraki = Math.min(3, suan + 1);
+        var koruma = {};
+        JBA.firinHesap.oneriler(stoklu, JBA.firinHesap.ayarlar(), simdi).forEach(function (r) {
+            if (!r.displayKind && r.amountToCook > 0 && (r.alertLevel === 'danger' || r.alertLevel === 'urgent-prep')) koruma[r.name] = r;
+        });
+        var liste = [];
+        stoklu.forEach(function (p) {
+            if (JBA.firinHesap.ekmekMi(p.name)) return;
+            var O = p.recommendations || [];
+            var P = p.pisenler || [];
+            if (!O.some(function (x) { return x > 0; })) return;
+            var raf = Math.max(0, Number(p.currentStock) || 0);
+            var donuk = Math.max(0, Number(p.frozenStock) || 0);
+            var oneriTop = 0, pisenTop = 0;
+            for (var i = 0; i <= suan; i++) { oneriTop += O[i] || 0; pisenTop += P[i] || 0; }
+            var dilimOneri = O[suan] || 0, dilimPisen = P[suan] || 0;
+            var eksik = y.hesap === 'dilim' ? Math.max(0, dilimOneri - dilimPisen) : Math.max(0, oneriTop - pisenTop);
+            var oneriPisir = Math.min(eksik, donuk);
+            var talep = dilimOneri > 0 || (O[sonraki] || 0) > 0;
+            var k = koruma[p.name];
+            var korumaPisir = k ? Math.min(donuk, k.amountToCook)
+                : (talep && raf <= y.esik && donuk > 0 ? Math.min(donuk, Math.max(1, dilimOneri - raf)) : 0);
+            var pisir = Math.min(donuk, Math.max(oneriPisir, korumaPisir));
+            var eskiCikar = 0;
+            // Stok azaldığı için pişirilen üründe eski çıkarılmaz (raf o an sıfıra inmesin)
+            if (oneriPisir > 0 && !korumaPisir && raf > 0 && dilimPisen === 0 && y.cikar !== 'yok') {
+                eskiCikar = y.cikar === 'hepsi' ? raf : Math.min(raf, oneriPisir);
+            }
+            var donukYetmez = eksik > donuk || (talep && raf <= y.esik && donuk === 0);
+            if (!pisir && !eskiCikar && !donukYetmez) return;
+            var parca = [y.hesap === 'dilim'
+                ? 'Bu dilimde öneri ' + dilimOneri + ', pişirilen ' + dilimPisen + '.'
+                : 'Bu dilime kadar öneri ' + oneriTop + ', pişirilen ' + pisenTop + '.'];
+            if (korumaPisir) parca.push(raf ? 'Rafta ' + raf + ' kaldı, bitmeden pişir.' : 'Raf bitti!');
+            if (eskiCikar) parca.push('Önce raftaki ' + eskiCikar + ' eskiyi çıkar.');
+            if (donukYetmez) parca.push('Donukta yeterli stok yok (' + donuk + ').');
+            liste.push({
+                ad: p.name, gorsel: p.imgSrc, raf: raf, donuk: donuk, oneri: dilimOneri,
+                pisir: pisir, eskiCikar: eskiCikar,
+                seviye: korumaPisir ? 'danger' : (pisir ? 'oneri' : 'warning'),
+                sebep: parca.join(' '), oneriler: O.slice(0, 4),
+                // Kritik stok alarm sesi yalnız stok korumasında (arka-plan/firin-ses.js)
+                sadeceOneri: !korumaPisir
+            });
+        });
+        var SIRA = { danger: 0, 'urgent-prep': 0, warning: 1, oneri: 2, 'ekmek-az': 3 };
+        return liste.concat(ekmekSatirlari(stoklu, suan)).sort(function (a, b) {
+            return ((SIRA[a.seviye] || 1) - (SIRA[b.seviye] || 1)) || (a.raf - b.raf) || (b.oneri - a.oneri);
+        });
+    }
+
+    /* Bildirime girenler:
+         - Donuktan pişen: pişirme panelinin ACİL (raf 0, sonraki dilime acil
+           hazırlık) ve KRİTİK (raf < hedefin dörtte biri) satırları.
+           Panel ikisini de kırmızı `danger` / `urgent-prep` olarak işaretliyor.
+         - Taze üretim ekmek: rafta EKMEK_SINIRI ve altı. */
+    function bildirimListesi(urunler, simdi) {
+        var stoklu = urunler.filter(function (p) { return p.stokOkundu; });
+        var suan = JBA.firinHesap.dilim(new Date(simdi).getHours()).index;
+        if (yontem.ad === 'yeni') return yeniYontemListesi(stoklu, simdi, suan);
+        var liste = JBA.firinHesap.oneriler(stoklu, JBA.firinHesap.ayarlar(), simdi)
+            .filter(function (r) {
+                return !r.displayKind && r.amountToCook > 0 && r.frozenStock > 0 &&
+                    (r.alertLevel === 'danger' || r.alertLevel === 'urgent-prep');
+            })
+            .map(function (r) {
+                return {
+                    ad: r.name, gorsel: r.imgSrc, raf: r.currentStock, donuk: r.frozenStock,
+                    oneri: r.currentTarget, pisir: r.amountToCook, seviye: r.alertLevel,
+                    sebep: r.reason, oneriler: r.recommendations.slice(0, 4)
+                };
+            });
+        liste = liste.concat(ekmekSatirlari(stoklu, suan));
         return liste.sort(function (a, b) { return (a.raf - b.raf) || (b.oneri - a.oneri); });
     }
 
@@ -368,6 +449,7 @@
     function kartHtml(u, dilimler, simdiki) {
         var seviye = u.seviye === 'urgent-prep' || u.seviye === 'cikar' ? 'danger'
             : u.seviye === 'ekmek-az' ? 'warning'
+            : u.seviye === 'oneri' ? 'info'
             : (ETIKET[u.seviye] ? u.seviye : 'warning');
         var gorsel = /^https:\/\//.test(u.gorsel || '')
             ? '<img class="gorsel" src="' + kacir(u.gorsel) + '" alt="">'
@@ -379,6 +461,7 @@
         }).join('');
         // Panelde ekmek de "N Adet Pişirilecek"; eksik yoksa (hedef karşılanmış) kalan adet
         var miktar = u.cikar ? sayi(u.raf) + ' Adet Çıkarılacak'
+            : u.eskiCikar > 0 ? sayi(u.eskiCikar) + ' Çıkar · ' + sayi(u.pisir) + ' Pişir'
             : u.ekmek && !(u.pisir > 0) ? sayi(u.raf) + ' Adet Kaldı'
             : sayi(u.pisir) + ' Adet Pişirilecek';
         var sag = '<div><span>MEVCUT</span><b>' + sayi(u.raf) + '</b></div>' +
@@ -564,6 +647,23 @@
         });
     }
 
+    /* Pişirme yöntemi (Asistan penceresi > Pişirme Yöntemi; arayuz/kapi.js yazar) */
+    var yontem = { ad: 'eski', hesap: 'toplam', cikar: 'kadar', esik: 1 };
+    function yontemOku() {
+        try {
+            chrome.storage.local.get('jbaFirinYontem', function (r) {
+                void chrome.runtime.lastError;
+                var a = (r && r.jbaFirinYontem) || {};
+                yontem = {
+                    ad: a.ad === 'yeni' ? 'yeni' : 'eski',
+                    hesap: a.hesap === 'dilim' ? 'dilim' : 'toplam',
+                    cikar: ['kadar', 'hepsi', 'yok'].indexOf(a.cikar) > -1 ? a.cikar : 'kadar',
+                    esik: [0, 1, 2].indexOf(Number(a.esik)) > -1 ? Number(a.esik) : 1
+                };
+            });
+        } catch (e) { /* yetim bağlam */ }
+    }
+
     function rafAlaniOku() {
         try {
             chrome.storage.local.get('jbaFirinRafAlani', function (r) {
@@ -605,13 +705,18 @@
         chrome.storage.onChanged.addListener(function (d, alan) {
             if (alan !== 'local') return;
             if (d.jbaFirinRafAlani) rafAlaniOku();
+            if (d.jbaFirinYontem) yontemOku();
             // Başka sekmede ertelendi ya da geri alındı
             if (d[ERTELE_ANAHTARI] && !son.sim) erteleOku(function () { ciz(son); });
         });
     } catch (e) { /* yetim bağlam */ }
 
     rafAlaniOku();
+    yontemOku();
     erteleOku();
+
+    // Deneme ve hata ayıklama için: (sonuc, sim, mod) → bildirim cevabı
+    JBA._firinHesapla = hesapla;
 
     JBA.kayit({
         kimlik: 'firinUyari',

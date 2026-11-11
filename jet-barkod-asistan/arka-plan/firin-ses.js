@@ -247,7 +247,8 @@ globalThis.jbaFirinKontrolSonucu = function (cevap, mod) {
     // Pişirme bildirimindeki ürünler; ertelenen sayılmaz
     const kritik = new Map();
     (cevap.liste || []).forEach((u) => {
-        if (u && u.ad && !u.ertelendi && !u.ekmek && !tazeMi(u.ad)) kritik.set(sade(u.ad), u.ad);
+        // Yeni pişirme yönteminde yalnız öneri eksiği olan satır kritik değildir (stok var)
+        if (u && u.ad && !u.ertelendi && !u.ekmek && !u.sadeceOneri && !tazeMi(u.ad)) kritik.set(sade(u.ad), u.ad);
     });
     const once = aktif.size;
     // Eklendi / pişirildi / ertelendi: alarm o ürün için biter

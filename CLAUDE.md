@@ -177,6 +177,8 @@ Arayüze dokunan her işte üçü sırayla kullanılır:
 - Anlık red/iptal kartı: `vps-api/kaldirma/index.js` + `vps-api/gece-raporu/index.js` VPS'e atılıp servis yeniden
   başlatılacak (SQL yok). Red ve iptal 2 dk toplanıp (en çok 6 dk) zamanlı raporun red kartıyla, hasar fotoğraflarıyla
   gidiyor; kart çizilemezse eski tek tek mesaj. Bekleyen kuyruk bellekte: servis tam o 2 dk içinde yeniden başlarsa o redler gitmez.
+- Asistan ayarları hesapta: `sql_files/asistan_ayar.sql` çalıştırılacak (SQL yalnız). Çalışana kadar Hızlı Bul
+  kategorileri (dahil/hariç kelimeler) yalnız Getir paneli belleğinde ve Asistan yedeğinde kalır.
 - `sw.js` (kök) sürümlü dosyaları telefonda saklıyor. Bir sorun olursa dosyanın başındaki "KAPATMAK
   GEREKİRSE" bloğu yayınlanır.
 - VPS'te apt upgrade + reboot bekliyor.

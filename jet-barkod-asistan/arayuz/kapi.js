@@ -188,6 +188,43 @@
         });
     }
 
+    /* Pişirme yöntemi (moduller/firin-uyari.js okuyor) */
+    var YONTEM_VARSAYILAN = { ad: 'eski', hesap: 'toplam', cikar: 'kadar', esik: 1 };
+    var yontemKok = document.getElementById('katYontem');
+    if (yontemKok) {
+        var yontemCiz = function (y) {
+            Array.prototype.forEach.call(yontemKok.querySelectorAll('[data-yontem]'), function (g) {
+                var alan = g.getAttribute('data-yontem');
+                Array.prototype.forEach.call(g.querySelectorAll('button'), function (b) {
+                    b.setAttribute('aria-checked', String(String(y[alan]) === b.getAttribute('data-deger')));
+                });
+            });
+            var yeni = y.ad === 'yeni';
+            document.getElementById('yontemYeni').hidden = !yeni;
+            document.getElementById('yontemAciklama').textContent = yeni
+                ? 'Öneri geride kalmasın, stok hiç bitmesin. Az satan ürün de öneri kadar pişirilir.'
+                : 'Pişirme panelinin acil ve kritik satırları. Bugünkü davranış.';
+            document.getElementById('yontemHesapAciklama').textContent = y.hesap === 'dilim'
+                ? 'Her dilimde o dilimin önerisi kadar pişirilir. Daha çok taze ürün, daha çok atık.'
+                : 'Bugün o saate kadarki toplam öneri tutturulur; önden fazla pişirilen sonraki dilimi karşılar. Puan gün toplamına bakıyor.';
+            var ozet = document.getElementById('yontemOzet');
+            if (ozet) ozet.textContent = yeni ? 'Yeni · ' + (y.hesap === 'dilim' ? 'her dilim' : 'gün toplamı') : 'Eski yöntem';
+        };
+        chrome.storage.local.get('jbaFirinYontem', function (r) {
+            var y = Object.assign({}, YONTEM_VARSAYILAN, (r && r.jbaFirinYontem) || {});
+            yontemCiz(y);
+            yontemKok.addEventListener('click', function (e) {
+                var b = e.target.closest('[data-yontem] button');
+                if (!b) return;
+                var alan = b.closest('[data-yontem]').getAttribute('data-yontem');
+                var d = b.getAttribute('data-deger');
+                y[alan] = alan === 'esik' ? Number(d) : d;
+                yontemCiz(y);
+                chrome.storage.local.set({ jbaFirinYontem: y });
+            });
+        });
+    }
+
     /* Kopyalayınca aramaya geç (moduller/toplu-kopyalama.js okuyor; varsayılan kapalı) */
     var aramayaGec = document.getElementById('aramayaGec');
     if (aramayaGec) {

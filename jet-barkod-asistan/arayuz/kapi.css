@@ -287,3 +287,12 @@ body {
 .ses-calan__yazi { flex: 1; min-width: 0; margin: 0; font-size: 12px; line-height: 1.35; color: #b91c1c; }
 .ses-calan .eylem { flex: none; min-height: 32px; }
 .kat__govde [data-grup][hidden], .kat__govde .ses-calan[hidden] { display: none; }
+
+/* Pişirme yöntemi: seçimler düğme (tarayıcı açılır listesi yok) */
+.secim { display: flex; flex-wrap: wrap; gap: 4px; padding: 3px; border-radius: 9px; background: var(--renk-cizgi); }
+.secim button { flex: 1 1 auto; min-height: 32px; padding: 0 10px; border: 0; border-radius: 7px; background: transparent; font: inherit; font-size: 12px; font-weight: 600; color: var(--renk-soluk); cursor: pointer;
+    transition: background-color 100ms ease, color 100ms ease; }
+.secim button[aria-checked="true"] { background: #fff; color: var(--renk-yazi); box-shadow: 0 1px 2px rgba(16,24,40,0.1); }
+.secim button:focus-visible { outline: 2px solid var(--renk-vurgu); outline-offset: 1px; }
+.yontem-yeni { display: flex; flex-direction: column; gap: 8px; }
+.kat__govde .yontem-yeni[hidden] { display: none; }
