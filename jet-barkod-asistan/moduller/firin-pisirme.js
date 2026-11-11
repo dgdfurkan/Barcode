@@ -1129,8 +1129,15 @@
           }
 
           /* Hesap ortak dosyada (moduller/firin-hesap.js); bildirim de aynısını kullanıyor */
+          /* Asistan > Pişirme Yöntemi: Eski ise panelin hesabı, Yeni ise öneri geride
+             kalmasın + stok bitmesin (bildirimle aynı hesap). Dilim başına pişirilen ve
+             satılan, sayfanın attığı isteğin yanıtından (sonFirinHam) ada göre eklenir. */
           function generateCookingRecommendations(products, settings) {
-            return JBA.firinHesap.oneriler(products, settings);
+            const api = JBA.firinHesap.apiDilimleri(sonFirinHam);
+            const zengin = products.map((p) => Object.assign({}, p, api[p.name] || {}));
+            return JBA.firinHesap.yontem().ad === 'yeni'
+              ? JBA.firinHesap.yeniOneriler(zengin, settings)
+              : JBA.firinHesap.oneriler(zengin, settings);
           }
 
           /* Ürün adı panelden geliyor; içinde `<` geçen bir ad satırın
@@ -1252,12 +1259,14 @@
                 danger: { border: '#ef4444', bg: '#fef2f2', labelBg: '#fee2e2' },
                 warning: { border: '#f59e0b', bg: '#fffbeb', labelBg: '#fef3c7' },
                 info: { border: '#3b82f6', bg: '#eff6ff', labelBg: '#dbeafe' },
+                oneri: { border: '#3b82f6', bg: '#eff6ff', labelBg: '#dbeafe' },
                 surplus: { border: '#0d9488', bg: '#f0fdfa', labelBg: '#ccfbf1' }
               };
               const labels = {
                 danger: 'ACİL PİŞİR',
                 warning: 'PİŞİRME GEREKLİ',
                 info: 'HAZIRLIK YAP',
+                oneri: p.eskiCikar > 0 ? 'ÇIKIŞ + PİŞİR' : 'ÖNERİ GERİDE',
                 surplus: 'FAZLA'
               };
               let currentColors;
@@ -1270,7 +1279,7 @@
                 currentColors = colorMap.surplus;
                 labelHtml = `<span style="font-size: 0.75rem; font-weight: 700; padding: 0.25rem 0.5rem; border-radius: 9999px; background-color: ${currentColors.labelBg}; color: ${currentColors.border}; flex-shrink: 0;">${labels.surplus}</span>`;
               } else {
-                currentColors = colorMap[p.alertLevel];
+                currentColors = colorMap[p.alertLevel] || colorMap.warning;
                 labelHtml = `<span style="font-size: 0.75rem; font-weight: 700; padding: 0.25rem 0.5rem; border-radius: 9999px; background-color: ${currentColors.labelBg}; color: ${currentColors.border}; flex-shrink: 0;">${labels[p.alertLevel]}</span>`;
               }
 
@@ -1279,7 +1288,16 @@
                 mainTitle = 'Donuktan pişirilecek stok görünmüyor';
               } else if (p.alertLevel === 'surplus') {
                 mainTitle = `${p.amountToCook} Adet Fazla`;
+              } else if (p.eskiCikar > 0) {
+                mainTitle = `${p.eskiCikar} Çıkar · ${p.amountToCook} Pişir`;
               }
+              // Dilim kutusunda öneri / satılan; altta gün boyu toplam (elle kontrol için)
+              const satisVar = Array.isArray(p.satislar);
+              const dilimSayi = (i) => p.recommendations[i] + (satisVar ? ' / ' + (Number(p.satislar[i]) || 0) : '');
+              const gun = JBA.firinHesap.gunToplamlari(p);
+              const gunSatiri = satisVar
+                ? `<p style="font-size: 0.75rem; font-weight: 600; color: #374151; margin: -0.25rem 0 0.5rem;">Gün boyu öneri ${gun.oneriGun} · pişirilen ${gun.pisenGun} · satılan ${gun.satisGun}</p>`
+                : '';
 
               const card = document.createElement('div');
               card.className = 'baking-card fade-in';
@@ -1297,11 +1315,12 @@
           </div>
           <p style="font-size: 1.5rem; font-weight: 700; margin: 0.25rem 0; color: #111827;">${mainTitle}</p>
           <p style="font-size: 0.75rem; font-weight: 500; color: #4b5563; margin-bottom: 0.5rem;">${p.reason}</p>
+          ${gunSatiri}
           <div style="margin-top: 0.75rem; padding-top: 0.5rem; border-top: 1px solid #e5e7eb; display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.25rem; text-align: center;">
-            <div style="${currentSlotIndex === 0 ? activeStyle : ''}"><div style="font-size: 0.875rem; font-weight: inherit;">${p.recommendations[0]}</div><div style="font-size: 0.625rem; ${currentSlotIndex === 0 ? '' : inactiveStyle}">08:00-12:00</div></div>
-            <div style="${currentSlotIndex === 1 ? activeStyle : ''}"><div style="font-size: 0.875rem; font-weight: inherit;">${p.recommendations[1]}</div><div style="font-size: 0.625rem; ${currentSlotIndex === 1 ? '' : inactiveStyle}">12:00-16:00</div></div>
-            <div style="${currentSlotIndex === 2 ? activeStyle : ''}"><div style="font-size: 0.875rem; font-weight: inherit;">${p.recommendations[2]}</div><div style="font-size: 0.625rem; ${currentSlotIndex === 2 ? '' : inactiveStyle}">16:00-20:00</div></div>
-            <div style="${currentSlotIndex === 3 ? activeStyle : ''}"><div style="font-size: 0.875rem; font-weight: inherit;">${p.recommendations[3]}</div><div style="font-size: 0.625rem; ${currentSlotIndex === 3 ? '' : inactiveStyle}">20:00-00:00</div></div>
+            <div style="${currentSlotIndex === 0 ? activeStyle : ''}"><div style="font-size: 0.875rem; font-weight: inherit;">${dilimSayi(0)}</div><div style="font-size: 0.625rem; ${currentSlotIndex === 0 ? '' : inactiveStyle}">08:00-12:00</div></div>
+            <div style="${currentSlotIndex === 1 ? activeStyle : ''}"><div style="font-size: 0.875rem; font-weight: inherit;">${dilimSayi(1)}</div><div style="font-size: 0.625rem; ${currentSlotIndex === 1 ? '' : inactiveStyle}">12:00-16:00</div></div>
+            <div style="${currentSlotIndex === 2 ? activeStyle : ''}"><div style="font-size: 0.875rem; font-weight: inherit;">${dilimSayi(2)}</div><div style="font-size: 0.625rem; ${currentSlotIndex === 2 ? '' : inactiveStyle}">16:00-20:00</div></div>
+            <div style="${currentSlotIndex === 3 ? activeStyle : ''}"><div style="font-size: 0.875rem; font-weight: inherit;">${dilimSayi(3)}</div><div style="font-size: 0.625rem; ${currentSlotIndex === 3 ? '' : inactiveStyle}">20:00-00:00</div></div>
           </div>
         </div>
         <div style="margin-left: 1rem; text-align: center; width: 80px; flex-shrink: 0; border-left: 1px solid #e5e7eb; padding-left: 1rem; display: flex; flex-direction: column; justify-content: center;">

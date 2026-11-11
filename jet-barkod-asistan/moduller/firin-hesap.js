@@ -269,7 +269,145 @@
       return finalRecommendations;
     }
 
+    /* ------------------------------------------------------------------
+       PİŞİRME YÖNTEMİ (Asistan penceresi > Pişirme Yöntemi; arayuz/kapi.js yazar)
+       Bildirim (firin-uyari.js) ve pişirme paneli (firin-pisirme.js) aynı ayarı
+       ve aynı hesabı kullanır.
+       ------------------------------------------------------------------ */
+    var yontemDegeri = { ad: 'eski', hesap: 'toplam', cikar: 'kadar', esik: 1 };
+    function yontemTemiz(a) {
+        a = a || {};
+        return {
+            ad: a.ad === 'yeni' ? 'yeni' : 'eski',
+            hesap: a.hesap === 'dilim' ? 'dilim' : 'toplam',
+            cikar: ['kadar', 'hepsi', 'yok'].indexOf(a.cikar) > -1 ? a.cikar : 'kadar',
+            esik: [0, 1, 2].indexOf(Number(a.esik)) > -1 ? Number(a.esik) : 1
+        };
+    }
+    try {
+        chrome.storage.local.get('jbaFirinYontem', function (r) {
+            void chrome.runtime.lastError;
+            yontemDegeri = yontemTemiz(r && r.jbaFirinYontem);
+        });
+        chrome.storage.onChanged.addListener(function (d, alan) {
+            if (alan === 'local' && d.jbaFirinYontem) yontemDegeri = yontemTemiz(d.jbaFirinYontem.newValue);
+        });
+    } catch (e) { /* yetim bağlam */ }
+
+    function toplam(l, son) {
+        var t = 0;
+        for (var i = 0; i <= son; i++) t += Number(l && l[i]) || 0;
+        return t;
+    }
+
+    /* Ürüne gün boyu sayıları ekler: öneri, pişirilen, satılan (panel verisinden) */
+    function gunToplamlari(p) {
+        return {
+            oneriGun: toplam(p.recommendations, 3),
+            pisenGun: toplam(p.pisenler, 3),
+            satisGun: toplam(p.satislar, 3)
+        };
+    }
+
+    /*
+     * YENİ YÖNTEM
+     * Fırın S/Ö puanı: Öneriye Uyum = günlük Pişirilen ÷ günlük Öneri (100'de
+     * kesilir), puan = (Stok Doğruluğu + Uyum) ÷ 2. Rafta stok varken pişirme
+     * girilmeyince az satan üründe öneri birikir. Burada iki şey birlikte:
+     *   1) ÖNERİ GERİDE KALMASIN. 'toplam': bu dilim sonuna kadarki öneri −
+     *      bugün pişirilen. 'dilim': bu dilimin önerisi − bu dilimde pişirilen.
+     *      Pişirme hiçbir zaman eksikten fazla istenmez.
+     *   2) STOK ASLA SIFIR OLMASIN. Raf eşiğe inince (0/1/2), bu ya da sonraki
+     *      dilimde talep varsa pişir; panelin acil satırları da katılır.
+     * Eski stok: öneri eksiği varken bu dilimde henüz pişirme yoksa raftakiler
+     * önceki dilimden kalmadır; ayara göre pişirilecek kadarı, hepsi ya da
+     * hiçbiri çıkarılır (stok koruması varken hiç çıkarılmaz).
+     * Ürünlerde pisenler[4] ve satislar[4] olmalı (yoksa sıfır sayılır).
+     */
+    function yeniOneriler(products, settings, yontem, simdi) {
+      var y = yontemTemiz(yontem || yontemDegeri);
+      var now = simdi ? new Date(simdi) : new Date();
+      var suan = getCurrentTimeSlot(now.getHours()).index;
+      var sonraki = Math.min(3, suan + 1);
+      var koruma = {};
+      generateCookingRecommendations(products, settings, simdi).forEach(function (r) {
+        if (!r.displayKind && r.amountToCook > 0 && (r.alertLevel === 'danger' || r.alertLevel === 'urgent-prep')) koruma[r.name] = r;
+      });
+      var satirlar = [];
+      products.forEach(function (ham) {
+        if (isBreadProduct(ham.name)) return;
+        var O = (ham.recommendations || []).map(function (r) { return Math.max(0, Number(r) || 0); });
+        var P = ham.pisenler || [];
+        var S = ham.satislar || [];
+        if (!O.some(function (x) { return x > 0; })) return;
+        var raf = Math.max(0, Number(ham.currentStock) || 0);
+        var donuk = Math.max(0, Number(ham.frozenStock) || 0);
+        var oneriTop = toplam(O, suan), pisenTop = toplam(P, suan);
+        var dilimOneri = O[suan] || 0, dilimPisen = Number(P[suan]) || 0;
+        var eksik = y.hesap === 'dilim' ? Math.max(0, dilimOneri - dilimPisen) : Math.max(0, oneriTop - pisenTop);
+        var oneriPisir = Math.min(eksik, donuk);
+        var talep = dilimOneri > 0 || (O[sonraki] || 0) > 0;
+        var k = koruma[ham.name];
+        var korumaPisir = k ? Math.min(donuk, k.amountToCook)
+          : (talep && raf <= y.esik && donuk > 0 ? Math.min(donuk, Math.max(1, dilimOneri - raf)) : 0);
+        var pisir = Math.min(donuk, Math.max(oneriPisir, korumaPisir));
+        var eskiCikar = 0;
+        if (oneriPisir > 0 && !korumaPisir && raf > 0 && dilimPisen === 0 && y.cikar !== 'yok') {
+          eskiCikar = y.cikar === 'hepsi' ? raf : Math.min(raf, oneriPisir);
+        }
+        var donukYetmez = eksik > donuk || (talep && raf <= y.esik && donuk === 0);
+        if (!pisir && !eskiCikar && !donukYetmez) return;
+        var parca = [y.hesap === 'dilim'
+          ? 'Bu dilimde öneri ' + dilimOneri + ', pişirilen ' + dilimPisen + '.'
+          : 'Bu dilime kadar öneri ' + oneriTop + ', pişirilen ' + pisenTop + '.'];
+        if (korumaPisir) parca.push(raf ? 'Rafta ' + raf + ' kaldı, bitmeden pişir.' : 'Raf bitti!');
+        if (eskiCikar) {
+          var oncekiSatis = suan > 0 ? (Number(S[suan - 1]) || 0) : null;
+          parca.push(oncekiSatis === 0
+            ? 'Önceki dilimde satılmadı; önerinin tutması için raftaki ' + eskiCikar + ' eskinin çıkışı yapılıp taze pişirilmeli.'
+            : 'Raftakiler önceki dilimden; önerinin tutması için ' + eskiCikar + ' eskinin çıkışı yapılıp taze pişirilmeli.');
+        }
+        if (donukYetmez) parca.push('Donukta yeterli stok yok (' + donuk + ').');
+        satirlar.push(Object.assign({}, ham, {
+          currentStock: raf, frozenStock: donuk, recommendations: O,
+          currentTarget: dilimOneri,
+          amountToCook: pisir,
+          eskiCikar: eskiCikar,
+          alertLevel: korumaPisir ? 'danger' : (pisir ? 'oneri' : 'warning'),
+          reason: parca.join(' '),
+          sortPriority: korumaPisir ? 1 : (pisir ? 3 : 2),
+          sadeceOneri: !korumaPisir,
+          displayKind: !pisir && donukYetmez ? 'bread-no-frozen' : undefined
+        }));
+      });
+      satirlar.sort(function (a, b) { return (a.sortPriority - b.sortPriority) || (a.currentStock - b.currentStock); });
+      return satirlar;
+    }
+
+    /* Panelin API yanıtından (GET /heating-estimations) ad → dilim başına öneri, pişirilen, satılan */
+    function apiDilimleri(ham) {
+      var sira = { 8: 0, 12: 1, 16: 2, 20: 3 };
+      var ad = {};
+      ((ham && ham.data) || []).forEach(function (d) {
+        var i = sira[Number(String(d.startDate || '').slice(11, 13))];
+        if (i === undefined) return;
+        (d.products || []).forEach(function (p) {
+          var n = p.fullName && typeof p.fullName === 'object' ? (p.fullName.tr || p.fullName.en) : (p.fullName || p.name);
+          n = n && typeof n === 'object' ? (n.tr || n.en) : n;
+          if (!n) return;
+          var x = ad[n] || (ad[n] = { pisenler: [0, 0, 0, 0], satislar: [0, 0, 0, 0] });
+          x.pisenler[i] = Math.max(0, Number(p.cookedQuantity) || 0);
+          x.satislar[i] = Math.max(0, Number(p.soldQuantity) || 0);
+        });
+      });
+      return ad;
+    }
+
     JBA.firinHesap = {
+        yeniOneriler: yeniOneriler,
+        yontem: function () { return yontemDegeri; },
+        gunToplamlari: gunToplamlari,
+        apiDilimleri: apiDilimleri,
         oneriler: generateCookingRecommendations,
         dilim: getCurrentTimeSlot,
         ekmekMi: isBreadProduct,

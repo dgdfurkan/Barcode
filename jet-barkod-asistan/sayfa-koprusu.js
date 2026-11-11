@@ -747,7 +747,8 @@
                         raf: typeof p.available === 'number' ? p.available : null,
                         donuk: typeof p.frozen === 'number' ? p.frozen : null,
                         rezerv: typeof p.reserve === 'number' ? p.reserve : null,
-                        pisen: Number(p.cookedQuantity) || 0
+                        pisen: Number(p.cookedQuantity) || 0,
+                        satis: Number(p.soldQuantity) || 0
                     };
                 })
             };
