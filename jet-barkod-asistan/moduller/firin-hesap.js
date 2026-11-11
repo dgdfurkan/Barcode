@@ -360,17 +360,17 @@
         }
         var donukYetmez = eksik > donuk || (talep && raf <= y.esik && donuk === 0);
         if (!pisir && !eskiCikar && !donukYetmez) return;
-        var parca = [y.hesap === 'dilim'
-          ? 'Bu dilimde öneri ' + dilimOneri + ', pişirilen ' + dilimPisen + '.'
-          : 'Bu dilime kadar öneri ' + oneriTop + ', pişirilen ' + pisenTop + '.'];
-        if (korumaPisir) parca.push(raf ? 'Rafta ' + raf + ' kaldı, bitmeden pişir.' : 'Raf bitti!');
+        // Kısa ve net: sayılar tabloda zaten var
+        var parca = [];
+        if (eksik > 0) parca.push(y.hesap === 'dilim'
+          ? 'Bu dilim: öneri ' + dilimOneri + ', pişirilen ' + dilimPisen + '.'
+          : 'Öneri ' + oneriTop + ', pişirilen ' + pisenTop + '.');
+        if (korumaPisir) parca.push(raf ? 'Rafta ' + raf + ' kaldı.' : 'Raf bitti.');
         if (eskiCikar) {
           var oncekiSatis = suan > 0 ? (Number(S[suan - 1]) || 0) : null;
-          parca.push(oncekiSatis === 0
-            ? 'Önceki dilimde satılmadı; önerinin tutması için raftaki ' + eskiCikar + ' eskinin çıkışı yapılıp taze pişirilmeli.'
-            : 'Raftakiler önceki dilimden; önerinin tutması için ' + eskiCikar + ' eskinin çıkışı yapılıp taze pişirilmeli.');
+          parca.push((oncekiSatis === 0 ? 'Satış yok: ' : '') + eskiCikar + ' eskiyi çıkar, taze pişir.');
         }
-        if (donukYetmez) parca.push('Donukta yeterli stok yok (' + donuk + ').');
+        if (donukYetmez) parca.push('Donuk yetmiyor (' + donuk + ').');
         satirlar.push(Object.assign({}, ham, {
           currentStock: raf, frozenStock: donuk, recommendations: O,
           currentTarget: dilimOneri,
@@ -385,6 +385,29 @@
       });
       satirlar.sort(function (a, b) { return (a.sortPriority - b.sortPriority) || (a.currentStock - b.currentStock); });
       return satirlar;
+    }
+
+    /*
+     * DİLİM TABLOSU: satırlar Öneri / Pişirilen / Satılan, sütunlar dört dilim + Toplam.
+     * Pişirme paneli, stok görünümü ve sağ üst bildirim aynı tabloyu kullanır; stil
+     * her yerin kendi CSS'inde (.jba-dt). Satış verisi yoksa yalnız Öneri satırı.
+     */
+    var DILIM_KISA = ['08–12', '12–16', '16–20', '20–24'];
+    function dilimTablosuHtml(p, suan) {
+      var O = p.recommendations || [];
+      var satirlar = [['Öneri', O]];
+      if (Array.isArray(p.pisenler)) satirlar.push(['Pişirilen', p.pisenler]);
+      if (Array.isArray(p.satislar)) satirlar.push(['Satılan', p.satislar]);
+      var sayi = function (x) { return String(Math.max(0, Number(x) || 0)); };
+      var h = '<table class="jba-dt"><thead><tr><th></th>' + DILIM_KISA.map(function (d, i) {
+        return '<th' + (i === suan ? ' class="su"' : '') + '>' + d + '</th>';
+      }).join('') + '<th class="top">Toplam</th></tr></thead><tbody>';
+      satirlar.forEach(function (r) {
+        h += '<tr><th>' + r[0] + '</th>' + [0, 1, 2, 3].map(function (i) {
+          return '<td' + (i === suan ? ' class="su"' : '') + '>' + sayi(r[1][i]) + '</td>';
+        }).join('') + '<td class="top">' + toplam(r[1], 3) + '</td></tr>';
+      });
+      return h + '</tbody></table>';
     }
 
     /* Panelin API yanıtından (GET /heating-estimations) ad → dilim başına öneri, pişirilen, satılan */
@@ -410,6 +433,7 @@
         yeniOneriler: yeniOneriler,
         yontem: function () { return yontemDegeri; },
         gunToplamlari: gunToplamlari,
+        dilimTablosuHtml: dilimTablosuHtml,
         apiDilimleri: apiDilimleri,
         oneriler: generateCookingRecommendations,
         dilim: getCurrentTimeSlot,

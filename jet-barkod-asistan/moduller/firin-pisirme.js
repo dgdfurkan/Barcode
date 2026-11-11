@@ -494,7 +494,7 @@
         }
         .baking-card-shelf .ba-shelf-bc svg {
           display: block;
-          width: min(176px, 100%) !important;
+          width: min(250px, 100%) !important;
           max-width: 100% !important;
           height: auto !important;
           max-height: 100% !important;
@@ -503,8 +503,8 @@
         #baking-assistant-results { padding: 1rem; max-height: 70vh; overflow-y: auto; }
         .baking-card-shelf {
           display: grid !important;
-          grid-template-columns: 52px minmax(0, 1fr) minmax(124px, 158px);
-          grid-template-rows: auto auto auto;
+          grid-template-columns: 52px minmax(0, 1fr) minmax(190px, 250px);
+          grid-template-rows: auto auto auto auto;
           align-items: start;
           column-gap: 0.65rem;
           row-gap: 0.2rem;
@@ -575,16 +575,26 @@
           min-width: 0;
         }
         .baking-card-shelf > .ba-shelf-dilim {
-          grid-column: 2;
-          grid-row: 3;
+          grid-column: 1 / -1;
+          grid-row: 4;
           margin: 0.25rem 0 0 !important;
           padding: 0.35rem 0 0 !important;
           border-top: 1px solid #e5e7eb;
-          display: grid !important;
-          grid-template-columns: repeat(4, 1fr);
-          gap: 0.2rem !important;
-          text-align: center;
+          display: block !important;
         }
+        .jba-dt { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; table-layout: fixed; }
+        .jba-dt th, .jba-dt td { padding: 0.2rem 0.25rem; text-align: center; font-size: 0.8125rem; line-height: 1.2; border-bottom: 1px solid #eef0f3; }
+        .jba-dt thead th { font-size: 0.6875rem; font-weight: 600; color: #6b7280; border-bottom: 1px solid #e5e7eb; }
+        .jba-dt tbody th { text-align: left; font-size: 0.75rem; font-weight: 600; color: #4b5563; width: 4.6rem; }
+        .jba-dt td { font-weight: 700; color: #111827; }
+        .jba-dt .su { background: #f0fdf4; color: #15803d; }
+        .jba-dt thead .su { color: #15803d; font-weight: 700; }
+        .jba-dt .top { border-left: 2px solid #e5e7eb; background: #f8fafc; font-weight: 800; color: #0f172a; width: 3.8rem; }
+        .jba-dt thead .top { color: #0f172a; font-weight: 700; }
+        .jba-dt tbody tr:last-child th, .jba-dt tbody tr:last-child td { border-bottom: 0; }
+        .ba-dt-kap { margin-top: 0.75rem; padding-top: 0.5rem; border-top: 1px solid #e5e7eb; }
+        .baking-card-shelf .jba-dt th, .baking-card-shelf .jba-dt td { font-size: 0.75rem; padding: 0.15rem 0.2rem; }
+        .baking-card-shelf .jba-dt tbody th { width: 4.2rem; font-size: 0.6875rem; }
         .baking-card { display: flex; align-items: stretch; padding: 1rem; border-left-width: 8px; border-radius: 0.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 1rem; background: white; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         .fade-in { animation: fadeIn 0.5s ease-out forwards; }
@@ -1101,7 +1111,7 @@
             else if (manualShelfToggle) shelfBannerKind = 'manual';
 
             if (useShelfMode) {
-              const rows = collectShelfStockRows(products, settings);
+              const rows = collectShelfStockRows(zenginlestir(products), settings);
               return { mode: 'shelf-exit', rows, currentSlotIndex, shelfBannerKind, hazirlikModu };
             }
             return {
@@ -1132,9 +1142,12 @@
           /* Asistan > Pişirme Yöntemi: Eski ise panelin hesabı, Yeni ise öneri geride
              kalmasın + stok bitmesin (bildirimle aynı hesap). Dilim başına pişirilen ve
              satılan, sayfanın attığı isteğin yanıtından (sonFirinHam) ada göre eklenir. */
-          function generateCookingRecommendations(products, settings) {
+          function zenginlestir(products) {
             const api = JBA.firinHesap.apiDilimleri(sonFirinHam);
-            const zengin = products.map((p) => Object.assign({}, p, api[p.name] || {}));
+            return products.map((p) => Object.assign({}, p, api[p.name] || {}));
+          }
+          function generateCookingRecommendations(products, settings) {
+            const zengin = zenginlestir(products);
             return JBA.firinHesap.yontem().ad === 'yeni'
               ? JBA.firinHesap.yeniOneriler(zengin, settings)
               : JBA.firinHesap.oneriler(zengin, settings);
@@ -1214,12 +1227,7 @@
           <span class="ba-shelf-donuk">Donuk · ${p.frozenStock}</span>
           ${stockHint}
         </div>
-        <div class="ba-shelf-dilim">
-            <div style="${currentSlotIndex === 0 ? activeStyle : ''}"><div style="font-size: 0.76rem; font-weight: inherit;">${p.recommendations[0]}</div><div style="font-size: 0.55rem; ${currentSlotIndex === 0 ? '' : inactiveStyle}">08–12</div></div>
-            <div style="${currentSlotIndex === 1 ? activeStyle : ''}"><div style="font-size: 0.76rem; font-weight: inherit;">${p.recommendations[1]}</div><div style="font-size: 0.55rem; ${currentSlotIndex === 1 ? '' : inactiveStyle}">12–16</div></div>
-            <div style="${currentSlotIndex === 2 ? activeStyle : ''}"><div style="font-size: 0.76rem; font-weight: inherit;">${p.recommendations[2]}</div><div style="font-size: 0.55rem; ${currentSlotIndex === 2 ? '' : inactiveStyle}">16–20</div></div>
-            <div style="${currentSlotIndex === 3 ? activeStyle : ''}"><div style="font-size: 0.76rem; font-weight: inherit;">${p.recommendations[3]}</div><div style="font-size: 0.55rem; ${currentSlotIndex === 3 ? '' : inactiveStyle}">20–00</div></div>
-        </div>`;
+        <div class="ba-shelf-dilim">${JBA.firinHesap.dilimTablosuHtml(p, currentSlotIndex)}</div>`;
               return card;
               }, p.name);
             });
@@ -1291,13 +1299,8 @@
               } else if (p.eskiCikar > 0) {
                 mainTitle = `${p.eskiCikar} Çıkar · ${p.amountToCook} Pişir`;
               }
-              // Dilim kutusunda öneri / satılan; altta gün boyu toplam (elle kontrol için)
-              const satisVar = Array.isArray(p.satislar);
-              const dilimSayi = (i) => p.recommendations[i] + (satisVar ? ' / ' + (Number(p.satislar[i]) || 0) : '');
-              const gun = JBA.firinHesap.gunToplamlari(p);
-              const gunSatiri = satisVar
-                ? `<p style="font-size: 0.75rem; font-weight: 600; color: #374151; margin: -0.25rem 0 0.5rem;">Gün boyu öneri ${gun.oneriGun} · pişirilen ${gun.pisenGun} · satılan ${gun.satisGun}</p>`
-                : '';
+              // Dilim tablosu: Öneri / Pişirilen / Satılan, en sağda Toplam (elle kontrol için)
+              const dilimTablo = JBA.firinHesap.dilimTablosuHtml(p, currentSlotIndex);
 
               const card = document.createElement('div');
               card.className = 'baking-card fade-in';
@@ -1314,14 +1317,8 @@
             <div style="display: flex; flex-shrink: 0; gap: 0.25rem; margin-left: 0.5rem;">${labelHtml}</div>
           </div>
           <p style="font-size: 1.5rem; font-weight: 700; margin: 0.25rem 0; color: #111827;">${mainTitle}</p>
-          <p style="font-size: 0.75rem; font-weight: 500; color: #4b5563; margin-bottom: 0.5rem;">${p.reason}</p>
-          ${gunSatiri}
-          <div style="margin-top: 0.75rem; padding-top: 0.5rem; border-top: 1px solid #e5e7eb; display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.25rem; text-align: center;">
-            <div style="${currentSlotIndex === 0 ? activeStyle : ''}"><div style="font-size: 0.875rem; font-weight: inherit;">${dilimSayi(0)}</div><div style="font-size: 0.625rem; ${currentSlotIndex === 0 ? '' : inactiveStyle}">08:00-12:00</div></div>
-            <div style="${currentSlotIndex === 1 ? activeStyle : ''}"><div style="font-size: 0.875rem; font-weight: inherit;">${dilimSayi(1)}</div><div style="font-size: 0.625rem; ${currentSlotIndex === 1 ? '' : inactiveStyle}">12:00-16:00</div></div>
-            <div style="${currentSlotIndex === 2 ? activeStyle : ''}"><div style="font-size: 0.875rem; font-weight: inherit;">${dilimSayi(2)}</div><div style="font-size: 0.625rem; ${currentSlotIndex === 2 ? '' : inactiveStyle}">16:00-20:00</div></div>
-            <div style="${currentSlotIndex === 3 ? activeStyle : ''}"><div style="font-size: 0.875rem; font-weight: inherit;">${dilimSayi(3)}</div><div style="font-size: 0.625rem; ${currentSlotIndex === 3 ? '' : inactiveStyle}">20:00-00:00</div></div>
-          </div>
+          <p style="font-size: 0.8125rem; font-weight: 600; color: #374151; margin-bottom: 0.5rem;">${p.reason}</p>
+          <div class="ba-dt-kap">${dilimTablo}</div>
         </div>
         <div style="margin-left: 1rem; text-align: center; width: 80px; flex-shrink: 0; border-left: 1px solid #e5e7eb; padding-left: 1rem; display: flex; flex-direction: column; justify-content: center;">
           <div style="font-size: 0.75rem; font-weight: 600; color: #4b5563;">MEVCUT</div>

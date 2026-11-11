@@ -95,9 +95,16 @@
         '.ad { margin: 0; font-size: 13px; font-weight: 600; line-height: 18px; overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow-wrap: anywhere; }',
         '.miktar { margin: 4px 0 0; font-size: 18px; font-weight: 700; line-height: 24px; color: #111827; font-variant-numeric: tabular-nums; }',
         '.sebep { margin: 4px 0 0; display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; font-size: 11px; color: #4b5563; }',
-        '.gun { margin: 4px 0 0; font-size: 11px; font-weight: 600; color: #374151; font-variant-numeric: tabular-nums; }',
+        '.jba-dt { width: 100%; border-collapse: collapse; table-layout: fixed; font-variant-numeric: tabular-nums; }',
+        '.jba-dt th, .jba-dt td { padding: 2px 2px; text-align: center; font-size: 11px; line-height: 15px; border-bottom: 1px solid rgba(17,24,39,.06); }',
+        '.jba-dt thead th { font-size: 10px; font-weight: 600; color: #6b7280; }',
+        '.jba-dt tbody th { text-align: left; font-weight: 600; color: #4b5563; width: 58px; }',
+        '.jba-dt td { font-weight: 700; color: #111827; }',
+        '.jba-dt .su { background: rgba(22,163,74,.08); color: #15803d; }',
+        '.jba-dt .top { border-left: 2px solid rgba(17,24,39,.1); font-weight: 800; color: #0f172a; width: 46px; }',
+        '.jba-dt tbody tr:last-child th, .jba-dt tbody tr:last-child td { border-bottom: 0; }',
         '.hap { flex: none; padding: 2px 8px; border-radius: 999px; background: var(--hap); color: var(--hap-yazi); font-size: 10px; font-weight: 700; line-height: 14px; }',
-        '.dilimler { margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(17,24,39,.08); display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; text-align: center; color: #6b7280; }',
+        '.dilimler { grid-column: 1 / -1; margin-top: 8px; padding-top: 6px; border-top: 1px solid rgba(17,24,39,.08); }',
         '.dilimler b { display: block; font-size: 12px; font-weight: 600; color: #374151; font-variant-numeric: tabular-nums; }',
         '.dilimler span { font-size: 10px; }',
         '.dilimler .su b, .dilimler .su span { color: #16a34a; font-weight: 700; }',
@@ -234,6 +241,7 @@
                 ad: r.name, gorsel: r.imgSrc, raf: r.currentStock, donuk: r.frozenStock, oneri: r.currentTarget,
                 pisir: r.amountToCook, eskiCikar: r.eskiCikar, seviye: r.alertLevel, sebep: r.reason,
                 oneriler: r.recommendations.slice(0, 4), satislar: (r.satislar || []).slice(0, 4),
+                pisenler: (r.pisenler || []).slice(0, 4),
                 // Kritik stok alarm sesi yalnız stok korumasında (arka-plan/firin-ses.js)
                 sadeceOneri: r.sadeceOneri
             }, JBA.firinHesap.gunToplamlari(r));
@@ -262,7 +270,8 @@
                 return Object.assign({
                     ad: r.name, gorsel: r.imgSrc, raf: r.currentStock, donuk: r.frozenStock,
                     oneri: r.currentTarget, pisir: r.amountToCook, seviye: r.alertLevel,
-                    sebep: r.reason, oneriler: r.recommendations.slice(0, 4), satislar: (r.satislar || []).slice(0, 4)
+                    sebep: r.reason, oneriler: r.recommendations.slice(0, 4), satislar: (r.satislar || []).slice(0, 4),
+                    pisenler: (r.pisenler || []).slice(0, 4)
                 }, JBA.firinHesap.gunToplamlari(r));
             });
         liste = liste.concat(ekmekSatirlari(stoklu, suan));
@@ -403,11 +412,8 @@
             ? '<img class="gorsel" src="' + kacir(u.gorsel) + '" alt="">'
             : '<span class="gorsel"></span>';
         var oneriler = Array.isArray(u.oneriler) ? u.oneriler : [];
-        var dilimHtml = (dilimler || []).slice(0, 4).map(function (et, i) {
-            var sat = Array.isArray(u.satislar) && u.satislar.length ? ' / ' + sayi(u.satislar[i]) : '';
-            return '<div' + (i === simdiki ? ' class="su"' : '') + '><b>' + sayi(oneriler[i]) + sat + '</b>' +
-                '<span>' + kacir(String(et).replace(/:00/g, '')) + '</span></div>';
-        }).join('');
+        // Öneri / Pişirilen / Satılan tablosu, en sağda Toplam (pişirme paneliyle aynı)
+        var dilimHtml = JBA.firinHesap.dilimTablosuHtml({ recommendations: oneriler, pisenler: u.pisenler, satislar: u.satislar }, simdiki);
         // Panelde ekmek de "N Adet Pişirilecek"; eksik yoksa (hedef karşılanmış) kalan adet
         var miktar = u.cikar ? sayi(u.raf) + ' Adet Çıkarılacak'
             : u.eskiCikar > 0 ? sayi(u.eskiCikar) + ' Çıkar · ' + sayi(u.pisir) + ' Pişir'
@@ -433,10 +439,9 @@
                 '<p class="miktar">' + miktar + '</p>' +
                 '<p class="sebep"><span class="hap">' + kacir(ETIKET[u.seviye] || 'PİŞİRME GEREKLİ') + '</span>' +
                 '<span>' + kacir(u.sebep || '') + '</span></p>' +
-                (typeof u.oneriGun === 'number' && !u.ekmek ? '<p class="gun">Gün boyu öneri ' + sayi(u.oneriGun) + ' · pişirilen ' + sayi(u.pisenGun) + ' · satılan ' + sayi(u.satisGun) + '</p>' : '') +
-                (dilimHtml ? '<div class="dilimler">' + dilimHtml + '</div>' : '') +
             '</div>' +
             '<div class="sag">' + sag + '</div>' +
+            (dilimHtml ? '<div class="dilimler">' + dilimHtml + '</div>' : '') +
             erteleHtml +
         '</li>';
     }
