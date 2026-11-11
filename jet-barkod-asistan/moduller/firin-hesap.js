@@ -344,7 +344,10 @@
         var donuk = Math.max(0, Number(ham.frozenStock) || 0);
         var oneriTop = toplam(O, suan), pisenTop = toplam(P, suan);
         var dilimOneri = O[suan] || 0, dilimPisen = Number(P[suan]) || 0;
-        var eksik = y.hesap === 'dilim' ? Math.max(0, dilimOneri - dilimPisen) : Math.max(0, oneriTop - pisenTop);
+        // Pişirilen sayısı okunamadıysa (panel verisi eşleşmedi) öneri takibi yapılmaz:
+        // yoksa bütün öneri yeniden "pişir" diye çıkardı. Yalnız stok koruması kalır.
+        var pisenBilinir = Array.isArray(ham.pisenler);
+        var eksik = !pisenBilinir ? 0 : y.hesap === 'dilim' ? Math.max(0, dilimOneri - dilimPisen) : Math.max(0, oneriTop - pisenTop);
         var oneriPisir = Math.min(eksik, donuk);
         var talep = dilimOneri > 0 || (O[sonraki] || 0) > 0;
         var k = koruma[ham.name];
