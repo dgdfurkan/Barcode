@@ -47,7 +47,7 @@
     /* Kendi yazmamız bitmeden ve bittikten sonraki bu süre içinde gelen okuma ekrana basılmaz:
        tik atılıp sunucuya varmadan eski hali okunursa tik bir an kaybolup geri gelirdi */
     var YAZMA_KORUMA_MS = 1500;
-    var KATALOG = '../veri/temp_products.js?v=20261030a';
+    var KATALOG = '../veri/temp_products.js?v=20261120a';
 
     var IKON = {
         icecek: '<path d="M9 3h6M10 3v3.5L8 9v10.5A1.5 1.5 0 0 0 9.5 21h5a1.5 1.5 0 0 0 1.5-1.5V9l-2-2.5V3"/><path d="M8 13h8"/>',
