@@ -43,6 +43,10 @@
                         ['kaldirma', 'itiraz', 'sayimHazirligi'].some(function (m) { return l.indexOf(m) !== -1; })) {
                         l = l.concat('gunlukSayim');
                     }
+                    /* Kurye Uyarısı hak listesine bağlı değil: açıp kapama Asistan'ın
+                       Kurye bölümünde (jbaKurye.acik). Liste ondan önce kaydedildiyse
+                       modül hiç başlamıyor, simülasyonda yalnız ses çalıyordu. */
+                    if (Array.isArray(l) && l.indexOf('kuryeUyari') === -1) l = l.concat('kuryeUyari');
                     coz(Array.isArray(l) ? l : null);
                 });
             } catch (e) {

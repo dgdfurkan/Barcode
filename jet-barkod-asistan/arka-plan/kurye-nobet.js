@@ -220,15 +220,15 @@ async function knErteleOku() {
 }
 
 /** Sekmelere gidecek uyarı: ayar ve ertelemeler uygulanmış hali */
-async function knUyari(sonuc, sim) {
+async function knUyari(sonuc, sim, esikler) {
     const e = await knErteleOku();
     const simdi = Date.now();
-    const eksikGoster = !!sonuc && knAyar.eksik && sonuc.eksik > 0 && (sim || !(e.eksik > simdi));
+    const eksikGoster = !!sonuc && (knAyar.eksik || sim) && sonuc.eksik > 0 && (sim || !(e.eksik > simdi));
     const uzun = [];
-    if (sonuc && knAyar.mola) {
+    if (sonuc && (knAyar.mola || sim)) {
         (sonuc.kuryeler || []).forEach((k) => {
             for (const x of KN_ADIMLAR) {
-                const esik = knAyar.esik[x.ad];
+                const esik = (esikler || knAyar.esik)[x.ad];
                 if (!esik || !x.tut(k.status)) continue;
                 const dk = x.grup ? k.dkGrup : k.dk;
                 if (dk == null || dk < esik) continue;
@@ -303,56 +303,70 @@ async function knKontrol(zorla) {
 /* Sipariş panosu nöbetçisi her 2 sn çağırır (arka-plan/pano-nobet.js) */
 globalThis.jbaKuryeNabiz = function () { knKontrol(false); };
 
-/* Simülasyon: her basışta rastgele bir durum. Oturum varsa depodaki gerçek
-   kuryelerin ad ve fotoğrafı kullanılır (yalnız ekranda, hiçbir yere yazılmaz),
-   durum, süre ve neden uydurulur. Kart çarpıya basılana kadar durur. */
+/* Simülasyon: her basışta rastgele. Oturum varsa deponun O ANKİ gerçek verisi
+   okunur (plan, kuryeler, durumları, süreleri) ve 1-3 kuryeye uydurma bir sorun
+   eklenir: toplaması uzamış, siparişi 15 dk sürmüş, uzun süredir meşgul...
+   Ad ve fotoğraf yalnız ekranda kalır, hiçbir yere yazılmaz. Eşiği kapalı adım
+   da simülasyonda örnek eşikle gösterilir ki her kart görülebilsin. Kart çarpıya
+   basılana kadar durur. */
 const KN_SIM_NEDEN = ['Yemek Molası', 'Yakıt Alımı', 'Kısa Mola', 'Araç Bakımı'];
 const KN_SIM_AD = ['Örnek Kurye', 'Deneme Kurye', 'Test Kurye', 'Yedek Kurye', 'Gece Kurye', 'Hafta Sonu Kurye'];
+const KN_SIM_ESIK = { mesgul: 60, toplama: 8, yolda: 15, adreste: 5, donen: 10, sipariste: 25 };
+const KN_SIM_KOD = { mesgul: 200, toplama: 600, yolda: 700, adreste: 800, donen: 900 };
 const knRast = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
 const knSec = (d) => d[Math.floor(Math.random() * d.length)];
+const knKaristir = (d) => { const k = d.slice(); for (let i = k.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [k[i], k[j]] = [k[j], k[i]]; } return k; };
 
-async function knSimKuryeler() {
+async function knSimGercek(sekmeler) {
     try {
-        const sekmeler = await knPanoSekmeleri();
         const o = await knOturum(sekmeler);
-        if (o.hata) return [];
+        if (o.hata) return null;
+        const sehir = await knSehir(o);
+        const saatBasi = new Date(); saatBasi.setMinutes(0, 0, 0);
+        const plan = await knGetir(o, '/warehouses/courier-plan/' + sehir + '?currentDate=' + saatBasi.getTime());
         const kur = await knGetir(o, '/courier/filter', { isLoggedIn: true });
-        return (kur && Array.isArray(kur.couriers) ? kur.couriers : []).map((k) => (k && k.courier) || k)
-            .filter((c) => c && c.warehouse === o.depo)
-            .map((c) => ({ id: String(c._id || ''), ad: String(c.name || 'Kurye').slice(0, 60), foto: /^https:\/\//.test(c.picURL || '') ? c.picURL : '' }));
-    } catch (e) { return []; }
+        const r = knHesapla(plan, kur && kur.couriers, o.depo, Date.now());
+        await knGrupTakip(r);
+        return r;
+    } catch (e) { return null; }
 }
 
 async function knSimulasyon() {
     await knAyarOku();
     const sekmeler = await knPanoSekmeleri();
     if (!sekmeler.length) return { ok: false, metin: 'Depo panelinin sipariş ekranı açık değil.' };
-    let kisiler = await knSimKuryeler();
-    if (kisiler.length < 3) kisiler = kisiler.concat(KN_SIM_AD.map((ad, i) => ({ id: 'sim-' + i, ad, foto: '' })));
-    kisiler = kisiler.sort(() => Math.random() - 0.5).slice(0, knRast(3, Math.min(8, kisiler.length)));
     const simdi = Date.now();
-    // Açık eşiklerden birkaçını aşan kurye olsun, gerisi rastgele
-    const acikAdim = KN_ADIMLAR.filter((x) => knAyar.esik[x.ad]).sort(() => Math.random() - 0.5);
-    const kodu = { mesgul: 200, toplama: 600, yolda: 700, adreste: 800, donen: 900, sipariste: knSec([400, 600, 700, 800]) };
-    const liste = kisiler.map((k, i) => {
-        let status, dk;
-        const asan = i < Math.min(acikAdim.length, knRast(1, 2)) ? acikAdim[i] : null;
-        if (asan) { status = kodu[asan.ad]; dk = knAyar.esik[asan.ad] + knRast(1, 25); }
-        else { status = knSec([100, 100, 200, 600, 700, 800, 900]); dk = knRast(1, 9); }
-        const kayit = Object.assign({}, k, { status, bas: simdi - dk * 60000, neden: status === 200 ? knSec(KN_SIM_NEDEN) : '' });
-        if (status >= 400 && status <= 800) kayit.grupBas = kayit.bas;
-        return kayit;
+    const gercek = await knSimGercek(sekmeler);
+    let liste = gercek ? gercek.kuryeler.map((k) => Object.assign({}, k)) : [];
+    const gercekVar = liste.length > 0;
+    // Kurye yoksa ya da çok azsa örnek adlarla tamamla
+    for (let i = 0; liste.length < 3 && i < KN_SIM_AD.length; i++) {
+        const dk = knRast(1, 6);
+        liste.push({ id: 'sim-' + i, ad: KN_SIM_AD[i], foto: '', status: knSec([100, 600, 700, 900]), bas: simdi - dk * 60000, neden: '' });
+    }
+    // Eşikler: kullanıcınınki, kapalı adıma örnek eşik
+    const esik = Object.assign({}, KN_SIM_ESIK, knAyar.esik);
+    // 1-3 kuryeye sorun, her biri farklı rastgele adımda
+    const adimlar = knKaristir(KN_ADIMLAR);
+    const sorunlu = knKaristir(liste).slice(0, Math.min(liste.length, knRast(1, 3)));
+    sorunlu.forEach((k, i) => {
+        const x = adimlar[i % adimlar.length];
+        const dk = esik[x.ad] + knRast(2, Math.max(4, Math.round(esik[x.ad] * 0.8)));
+        k.status = x.ad === 'sipariste' ? knSec([400, 500, 600, 700, 800]) : KN_SIM_KOD[x.ad];
+        k.bas = simdi - (x.ad === 'sipariste' ? knRast(1, 4) : dk) * 60000;
+        k.grupBas = x.ad === 'sipariste' ? simdi - dk * 60000 : (k.status >= 400 && k.status <= 800 ? k.bas : null);
+        k.neden = k.status === 200 ? knSec(KN_SIM_NEDEN) : '';
     });
-    // En az bir meşgul olsun ki kartta meşgul listesi görünsün
-    if (!liste.some((k) => k.status === 200)) { const k = liste[liste.length - 1]; k.status = 200; k.neden = knSec(KN_SIM_NEDEN); }
+    // Kurye eksiği de görünsün: plan gerçek planın altındaysa bir fazlası
+    if (!liste.some((k) => k.status === 200)) { const k = liste.find((x) => sorunlu.indexOf(x) === -1) || liste[0]; k.status = 200; k.bas = simdi - knRast(3, 20) * 60000; k.neden = knSec(KN_SIM_NEDEN); k.grupBas = null; }
     const ozet = knOzet(0, liste, simdi);
-    ozet.planlanan = ozet.aktif + knRast(1, 2);
-    ozet.eksik = ozet.planlanan - ozet.aktif;
-    const mesaj = await knUyari(ozet, true);
+    ozet.planlanan = Math.max(gercek ? gercek.planlanan : 0, ozet.aktif + knRast(1, 2));
+    ozet.eksik = Math.max(1, ozet.planlanan - ozet.aktif);
+    const mesaj = await knUyari(ozet, true, esik);
     mesaj.sure = KN_SIM_MS;
     await knYay(mesaj, sekmeler);
     if (knAyar.sesAcik && typeof globalThis.jbaSesCal === 'function') globalThis.jbaSesCal(knAyar.ses, 2, 0);
-    return { ok: true };
+    return { ok: true, metin: gercekVar ? 'Gerçek kuryelerle simülasyon' : 'Örnek kuryelerle simülasyon (franchise oturumu yok)' };
 }
 
 chrome.runtime.onMessage.addListener((m, gonderen, cevapla) => {
