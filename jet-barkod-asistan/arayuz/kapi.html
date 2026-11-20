@@ -10,21 +10,52 @@
     <img class="bas__logo" src="../varliklar/ikon48.png" alt="">
     <div class="bas__yazi">
       <h1 class="bas__ad">Jet Barkod Asistan</h1>
-      <p class="bas__yer" id="yer">yükleniyor</p>
+      <p class="bas__yer"><span class="bas__nokta" aria-hidden="true"></span><span id="yer">yükleniyor</span></p>
     </div>
     <span class="rozet" id="rozet"></span>
   </header>
 
-  <main id="govde" class="govde">
-    <p class="bos">Durum okunuyor...</p>
-  </main>
+  <div class="duzen">
+    <nav class="menu" role="tablist" aria-orientation="vertical" aria-label="Asistan bölümleri">
+      <button type="button" class="menu__oge" role="tab" data-bolum="durum" aria-selected="false" aria-controls="bolum-durum">
+        <svg class="menu__ikon" viewBox="0 0 20 20" aria-hidden="true"><path d="M3.5 10h3l2-5 3 10 2-5h3"/></svg>
+        <span class="menu__metin"><span class="menu__ad">Durum</span><span class="menu__ozet" id="durumOzet">Bu sayfa</span></span>
+      </button>
+      <button type="button" class="menu__oge" role="tab" data-bolum="firin" aria-selected="false" aria-controls="bolum-firin">
+        <svg class="menu__ikon" viewBox="0 0 20 20" aria-hidden="true"><path d="M4 8.5h12v7.5a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 4 16z"/><path d="M4 11.5h12M7 5.5c0-1 1-1 1-2M10 5.5c0-1 1-1 1-2M13 5.5c0-1 1-1 1-2"/></svg>
+        <span class="menu__metin"><span class="menu__ad">Fırın</span><span class="menu__ozet" id="yontemOzet">Eski yöntem</span></span>
+      </button>
+      <button type="button" class="menu__oge" role="tab" data-bolum="ses" aria-selected="false" aria-controls="bolum-ses">
+        <svg class="menu__ikon" viewBox="0 0 20 20" aria-hidden="true"><path d="M4 8v4h3l4 3.5v-11L7 8z"/><path d="M14 7.5a3.5 3.5 0 0 1 0 5M15.8 5.5a6.3 6.3 0 0 1 0 9"/></svg>
+        <span class="menu__metin"><span class="menu__ad">Fırın Sesi</span><span class="menu__ozet" id="sesOzet">Her fırın satışında</span></span>
+      </button>
+      <button type="button" class="menu__oge" role="tab" data-bolum="siparis" aria-selected="false" aria-controls="bolum-siparis">
+        <svg class="menu__ikon" viewBox="0 0 20 20" aria-hidden="true"><rect x="5" y="3.5" width="10" height="13" rx="2"/><path d="M8 7.5h4M8 10.5h4M8 13.5h2.5"/></svg>
+        <span class="menu__metin"><span class="menu__ad">Siparişler</span><span class="menu__ozet" id="aramaOzet">Aramaya geçiş kapalı</span></span>
+      </button>
+      <button type="button" class="menu__oge" role="tab" data-bolum="gunluk" aria-selected="false" aria-controls="bolum-gunluk">
+        <svg class="menu__ikon" viewBox="0 0 20 20" aria-hidden="true"><rect x="3.5" y="4.5" width="13" height="12" rx="2"/><path d="M3.5 8.5h13M7 3v3M13 3v3M7.5 12.5l1.8 1.8 3.5-3.6"/></svg>
+        <span class="menu__metin"><span class="menu__ad">Günlük Sayım</span><span class="menu__ozet" id="gunlukOzet">Bugün henüz eklenmedi</span></span>
+      </button>
+      <div class="menu__bosluk"></div>
+      <a class="menu__site" id="siteBag" href="https://jetbarkod.com.tr/arama/" target="_blank" rel="noopener">
+        <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M11 4h5v5M16 4l-7 7M14 11.5V15a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h3.5"/></svg>
+        <span>Jet Barkod'u aç</span>
+      </a>
+      <span class="menu__surum" id="surum"></span>
+    </nav>
 
-  <section class="kat" id="katYontem">
-    <button type="button" class="kat__bas" aria-expanded="false" aria-controls="katYontemGovde">
-      <span class="kat__metin"><span class="ayar__ad">Pişirme Yöntemi</span><span class="kat__ozet" id="yontemOzet">Eski yöntem</span></span>
-      <svg class="kat__ok" viewBox="0 0 20 20" aria-hidden="true"><path d="m5 8 5 5 5-5"/></svg>
-    </button>
-    <div class="kat__govde" id="katYontemGovde" hidden>
+    <main class="icerik">
+      <section class="bolum" id="bolum-durum" role="tabpanel" data-bolum="durum">
+        <header class="bolum__bas"><h2>Bu Sayfada Çalışanlar</h2><p>Açık sekmedeki Getir panelinde uyanan modüller ve hızlı eylemler.</p></header>
+        <div class="kart kart--liste"><div id="govde" class="govde"><p class="bos">Durum okunuyor...</p></div></div>
+      </section>
+
+      <section class="bolum" id="bolum-firin" role="tabpanel" data-bolum="firin" hidden>
+        <header class="bolum__bas"><h2>Fırın</h2><p>Pişirme önerileri, bildirim kartı ve pişirme paneli bu ayarlara göre çalışır.</p></header>
+        <div class="kart" id="katYontem">
+          <div class="kart__bas"><h3>Pişirme Yöntemi</h3><p>Eski: panelin acil satırları. Yeni: öneri geride kalmasın, stok hiç bitmesin.</p></div>
+          <div class="kart__govde">
       <div class="secim" role="radiogroup" aria-label="Pişirme yöntemi" data-yontem="ad">
         <button type="button" role="radio" data-deger="eski" aria-checked="true">Eski</button>
         <button type="button" role="radio" data-deger="yeni" aria-checked="false">Yeni</button>
@@ -51,52 +82,39 @@
         </div>
         <p class="ayar__ozet">Pişirme hiçbir zaman öneri eksiğinden fazla istenmez; çok satan ürün eşiğe inince dilim içinde yeniden pişirilir.</p>
       </div>
-    </div>
-  </section>
+          </div>
+        </div>
+        <div class="kart">
+          <div class="kart__bas"><h3>Fırın Bildirimi</h3><p>Kontrol panelinde pişirilecek ürün varsa sağ üstte haber verir. 08:00-23:00 arası.</p></div>
+          <div class="kart__govde">
+            <div class="satir"><span class="satir__ad">Kontrol Sıklığı</span>
+              <select class="ayar__secim" id="firinAyar" aria-label="Fırın bildirimi kontrol sıklığı">
+                <option value="15">15 saniyede bir</option>
+                <option value="30">30 saniyede bir</option>
+                <option value="60">Dakikada bir</option>
+                <option value="180">3 dakikada bir</option>
+                <option value="0">Kapalı</option>
+              </select>
+            </div>
+            <div class="satir satir--durum">
+              <p class="ayar__durum" id="firinDurum">Henüz kontrol yapılmadı.</p>
+              <button type="button" class="eylem" id="firinSim">Simülasyonu Göster</button>
+            </div>
+          </div>
+        </div>
+      </section>
 
-  <section class="ayar" aria-label="Fırın bildirimi">
-    <div class="ayar__metin">
-      <p class="ayar__ad">Fırın Bildirimi</p>
-      <p class="ayar__ozet">Kontrol panelinde pişirilecek ürün varsa sağ üstte haber verir. 08:00-23:00 arası.</p>
-    </div>
-    <select class="ayar__secim" id="firinAyar" aria-label="Fırın bildirimi kontrol sıklığı">
-      <option value="15">15 saniyede bir</option>
-      <option value="30">30 saniyede bir</option>
-      <option value="60">Dakikada bir</option>
-      <option value="180">3 dakikada bir</option>
-      <option value="0">Kapalı</option>
-    </select>
-  </section>
-  <section class="ayar ayar--alt" aria-label="Fırın bildirimi durumu">
-    <p class="ayar__durum" id="firinDurum">Henüz kontrol yapılmadı.</p>
-    <button type="button" class="eylem" id="firinSim">Simülasyonu Göster</button>
-  </section>
-
-  <section class="ayar" aria-label="Kopyalayınca aramaya geç">
-    <div class="ayar__metin">
-      <p class="ayar__ad">Kopyalayınca Aramaya Geç</p>
-      <p class="ayar__ozet">Siparişte Tümünü Kopyala'ya basınca Jet Barkod arama sekmesi açıksa ona geçer. Açık değilse yeni sekme açmaz.</p>
-    </div>
-    <select class="ayar__secim" id="aramayaGec" aria-label="Kopyalayınca aramaya geç">
-      <option value="0">Kapalı</option>
-      <option value="1">Açık</option>
-    </select>
-  </section>
-
-  <section class="kat" id="katSes">
-    <button type="button" class="kat__bas" aria-expanded="false" aria-controls="katSesGovde">
-      <span class="kat__metin"><span class="ayar__ad">Fırın Sesi</span><span class="kat__ozet" id="sesOzet">Her fırın satışında</span></span>
-      <svg class="kat__ok" viewBox="0 0 20 20" aria-hidden="true"><path d="m5 8 5 5 5-5"/></svg>
-    </button>
-    <div class="kat__govde" id="katSesGovde" hidden>
-      <p class="ayar__ozet">Ekmek (200 g) gibi taze ekmekler hariç fırın ürünleri için. 08:00-23:30 arası, depo paneli açıkken çalar; müzik açıkken de duyulur. Bilgisayarın ana sesini eklenti açamaz, onu açık tut.</p>
+      <section class="bolum" id="bolum-ses" role="tabpanel" data-bolum="ses" hidden>
+        <header class="bolum__bas"><h2>Fırın Sesi</h2><p>Taze ekmekler hariç fırın satışında, kritik stokta ve 23:30 çıkışta çalar. Depo paneli açıkken, 08:00-23:30 arası. Bilgisayarın ana sesi açık olmalı.</p></header>
+        <div class="kart" id="katSes">
+          <div class="kart__govde ses-govde">
       <div class="ses-satir">
         <label class="ses-satir__ad" for="sesDuzey">Ses Düzeyi</label>
         <input type="range" class="ses-kaydirac" id="sesDuzey" min="10" max="100" step="10" value="100">
         <output class="ses-deger" id="sesDuzeyYazi" for="sesDuzey">%100</output>
       </div>
 
-      <p class="ses-baslik">Satış</p>
+      <p class="ses-baslik">Satış Sesi</p>
       <div class="ses-satir">
         <label class="ses-satir__ad" for="sesSatis">Satınca</label>
         <select class="ayar__secim" id="sesSatis">
@@ -200,16 +218,29 @@
       </div>
       <p class="ayar__ozet" data-grup="cikis">Raftaki fırın ürünleri çıkarılınca tekrar susar.</p>
       <p class="ayar__durum" id="sesDurum">Henüz çalmadı.</p>
-    </div>
-  </section>
+          </div>
+        </div>
+      </section>
 
-  <section class="kat" id="katGunluk">
-    <button type="button" class="kat__bas" aria-expanded="false" aria-controls="katGunlukGovde">
-      <span class="kat__metin"><span class="ayar__ad">Günlük Sayım</span><span class="kat__ozet" id="gunlukOzet">Bugün henüz eklenmedi</span></span>
-      <svg class="kat__ok" viewBox="0 0 20 20" aria-hidden="true"><path d="m5 8 5 5 5-5"/></svg>
-    </button>
-    <div class="kat__govde" id="katGunlukGovde" hidden>
-      <p class="ayar__ozet">50'lik sayım her sabah 06:00'da sayım sayfasına kendiliğinden eklenir; sayfayı açmak gerekmez.</p>
+      <section class="bolum" id="bolum-siparis" role="tabpanel" data-bolum="siparis" hidden>
+        <header class="bolum__bas"><h2>Siparişler</h2><p>Sipariş panelindeki kopyalama ve Jet Barkod'a geçiş.</p></header>
+        <div class="kart">
+          <div class="kart__bas"><h3>Kopyalayınca Aramaya Geç</h3><p>Siparişte Tümünü Kopyala'ya basınca Jet Barkod arama sekmesi açıksa ona geçer. Açık değilse yeni sekme açmaz.</p></div>
+          <div class="kart__govde">
+            <div class="satir"><span class="satir__ad">Geçiş</span>
+              <select class="ayar__secim" id="aramayaGec" aria-label="Kopyalayınca aramaya geç">
+                <option value="0">Kapalı</option>
+                <option value="1">Açık</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="bolum" id="bolum-gunluk" role="tabpanel" data-bolum="gunluk" hidden>
+        <header class="bolum__bas"><h2>Günlük Sayım</h2><p>50'lik sayım her sabah 06:00'da sayım sayfasına kendiliğinden eklenir; sayfayı açmak gerekmez.</p></header>
+        <div class="kart" id="katGunluk">
+          <div class="kart__govde">
       <div class="kat__secenekler">
         <label class="secenek"><input type="checkbox" id="gunlukAyarEkle" checked><span>06:00'da sayımı ekle</span></label>
         <label class="secenek"><input type="checkbox" id="gunlukAyarSabah" checked><span>08:00 kartı</span></label>
@@ -221,15 +252,14 @@
         <button type="button" class="eylem" id="gunlukSimSabah">08:00 Kartı</button>
         <button type="button" class="eylem" id="gunlukSimGece">Gece Uyarısı</button>
       </div>
-    </div>
-  </section>
-
-  <footer class="alt">
-    <span class="alt__surum" id="surum"></span>
-    <a class="alt__bag" id="siteBag" href="https://jetbarkod.com.tr/arama/" target="_blank" rel="noopener">Jet Barkod'u aç</a>
-  </footer>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
 
   <script src="../ortak/ses-sentez.js"></script>
   <script src="kapi.js"></script>
+  <script src="secici.js"></script>
 </body>
 </html>
