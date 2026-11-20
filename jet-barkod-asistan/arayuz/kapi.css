@@ -320,3 +320,17 @@ body.sayfa-acik .bas__nokta { background: var(--yesil); box-shadow: 0 0 0 3px rg
 @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { transition: none !important; animation: none !important; }
 }
+
+/* Kurye süre eşikleri: ad solda, dakika kutusu sağda; hepsi aynı hizada */
+.esikler { display: flex; flex-direction: column; gap: 4px; }
+.esik { display: flex; align-items: center; gap: 12px; min-height: 40px; }
+.esik__ad { flex: 1; min-width: 0; font-size: 13px; font-weight: 600; color: var(--yazi-orta); }
+.esik__kutu { flex: none; display: flex; align-items: center; gap: 6px; }
+.esik__kutu input { width: 72px; height: 36px; padding: 0 10px; border: 1px solid var(--cizgi-sert); border-radius: 9px; background: var(--yuzey);
+  font: inherit; font-size: 13px; font-weight: 700; color: var(--yazi); text-align: right; font-variant-numeric: tabular-nums; -moz-appearance: textfield;
+  transition: border-color var(--gecis), box-shadow var(--gecis); }
+.esik__kutu input::-webkit-outer-spin-button, .esik__kutu input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.esik__kutu input::placeholder { color: var(--soluk); font-weight: 600; }
+.esik__kutu input:focus { outline: none; border-color: var(--mavi); box-shadow: 0 0 0 3px var(--mavi-50); }
+.esik__dk { width: 18px; font-size: 12px; font-weight: 600; color: var(--sonuk); }
+@media (prefers-reduced-motion: reduce) { .esik__kutu input { transition: none; } }

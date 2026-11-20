@@ -17,8 +17,10 @@
  *   Siparişte   400-800          Geri dönen  900
  *   Toplam      bütün giriş yapmış kuryeler
  * Aktif = müsait + siparişte + geri dönen (meşgul hariç). Planlanan > aktif
- * ise kurye eksiği var. Meşgulde molaEsik dakikadan uzun kalan kurye ayrıca
- * bildirilir (statusLastChangedAt).
+ * ise kurye eksiği var. Bir adımda (meşgul, toplamada, yolda, adreste, geri
+ * dönüyor, siparişte) kullanıcının yazdığı dakikadan uzun kalan kurye ayrıca
+ * bildirilir. Tek kodlu adımda süre statusLastChangedAt'ten; "siparişte" bir
+ * kod aralığı (400-800), oraya girişi kendimiz izliyoruz (storage.session).
  *
  * Uyarı depo panelinin sipariş ekranında sol üstte (moduller/kurye-uyari.js).
  * Ertele: eksik için, her kurye için ayrı; 15/30/45/60 dk. Ses: uyarı başlayınca
@@ -33,8 +35,19 @@ const KN_SEHIR = 'jbaKuryeSehir';
 const KN_GETIR = 'https://franchise-api-gateway.getirapi.com';
 const KN_PANO = 'https://warehouse.getir.com/r/*/dashboard/orders*';
 const KN_KIMLIK = /^[0-9a-f]{24}$/;
-const KN_VARSAYILAN = { acik: true, sn: 15, eksik: true, mola: true, molaDk: 60, ses: 'kampana', sesAcik: true, sesAralik: 2 };
-const KN_SIM_MS = 20 * 1000;
+const KN_VARSAYILAN = { acik: true, sn: 15, eksik: true, mola: true, esik: { mesgul: 60 }, ses: 'kampana', sesAcik: true, sesAralik: 2 };
+const KN_SIM_MS = 10 * 60 * 1000; // simülasyon çarpıya basılana kadar; en çok 10 dk
+const KN_GRUP = 'jbaKuryeGrup';
+/* Süre eşiği adımları. Sıra önemli: bir kurye için ilk tutan adım bildirilir
+   (toplamadaki kurye "siparişte" eşiğine de girer, tek kart yeter). */
+const KN_ADIMLAR = [
+    { ad: 'mesgul', fiil: 'meşgulde', tut: (s) => s === 200 || (s >= 4000 && s <= 4200) },
+    { ad: 'toplama', fiil: 'toplamada', tut: (s) => s === 600 },
+    { ad: 'yolda', fiil: 'yolda', tut: (s) => s === 700 },
+    { ad: 'adreste', fiil: 'adreste', tut: (s) => s === 800 },
+    { ad: 'donen', fiil: 'geri dönüyor', tut: (s) => s === 900 },
+    { ad: 'sipariste', fiil: 'siparişte', tut: (s) => s >= 400 && s <= 800, grup: true },
+];
 
 let knAyar = Object.assign({}, KN_VARSAYILAN);
 let knSonKontrol = 0;
@@ -42,7 +55,18 @@ let knCalisiyor = false;
 let knSon = null;            // son sonuç (sekme yeniden açılınca hemen çizilsin)
 let knSonSes = 0;
 let knOncekiImza = '';
-let knSimBitis = 0;
+
+/** Eşikler kullanıcının yazdığı dakika (1-600); boş ya da 0 kapalı.
+    0.57'deki tek "meşgul eşiği" (molaDk) varsa ona taşınır. */
+function knEsikOku(a) {
+    const kaynak = a && a.esik && typeof a.esik === 'object' ? a.esik : { mesgul: Number(a && a.molaDk) || 60 };
+    const e = {};
+    KN_ADIMLAR.forEach((x) => {
+        const n = Math.round(Number(kaynak[x.ad]));
+        if (n >= 1 && n <= 600) e[x.ad] = n;
+    });
+    return e;
+}
 
 async function knAyarOku() {
     try {
@@ -52,7 +76,7 @@ async function knAyarOku() {
             sn: [15, 20, 30, 60].includes(Number(a.sn)) ? Number(a.sn) : KN_VARSAYILAN.sn,
             eksik: a.eksik !== false,
             mola: a.mola !== false,
-            molaDk: [30, 45, 60, 90, 120].includes(Number(a.molaDk)) ? Number(a.molaDk) : KN_VARSAYILAN.molaDk,
+            esik: knEsikOku(a),
             ses: typeof a.ses === 'string' && a.ses ? a.ses : KN_VARSAYILAN.ses,
             sesAcik: a.sesAcik !== false,
             sesAralik: [1, 2, 5, 10].includes(Number(a.sesAralik)) ? Number(a.sesAralik) : KN_VARSAYILAN.sesAralik,
@@ -147,24 +171,48 @@ function knHesapla(plan, kuryeler, depo, simdi) {
     const p = adaylar.find((x) => Date.parse(x.startDate) <= simdi && simdi < Date.parse(x.endDate)) || adaylar[0];
     const planlanan = p && p.courierPlanByCourierType
         ? Object.values(p.courierPlanByCourierType).reduce((t, v) => t + (Number(v) || 0), 0) : 0;
-    const sayi = { toplam: 0, musait: 0, sipariste: 0, donen: 0, mesgul: 0 };
-    const mola = [];
+    const liste = [];
     (Array.isArray(kuryeler) ? kuryeler : []).forEach((k) => {
         const c = k && k.courier ? k.courier : k;
         if (!c || c.warehouse !== depo) return;
+        const bas = Date.parse(c.statusLastChangedAt || '');
+        liste.push({ id: String(c._id || ''), ad: String(c.name || 'Kurye').slice(0, 60),
+            foto: /^https:\/\//.test(c.picURL || '') ? c.picURL : '', status: Number(c.status) || 0,
+            bas: Number.isFinite(bas) ? bas : null, neden: knNeden(c) });
+    });
+    return knOzet(planlanan, liste, simdi);
+}
+
+/** Kurye listesinden sayılar ve meşgul listesi (gerçek ve simülasyon ortak) */
+function knOzet(planlanan, liste, simdi) {
+    const sayi = { toplam: 0, musait: 0, sipariste: 0, donen: 0, mesgul: 0 };
+    const mola = [];
+    liste.forEach((k) => {
+        k.dk = k.bas != null ? Math.max(0, Math.floor((simdi - k.bas) / 60000)) : null;
+        if (k.grupBas != null) k.dkGrup = Math.max(0, Math.floor((simdi - k.grupBas) / 60000));
         sayi.toplam++;
-        const g = knDurumGrubu(c.status);
+        const g = knDurumGrubu(k.status);
         if (g !== 'diger') sayi[g]++;
-        if (g === 'mesgul') {
-            const bas = Date.parse(c.statusLastChangedAt || '');
-            mola.push({ id: String(c._id || ''), ad: String(c.name || 'Kurye').slice(0, 60),
-                foto: /^https:\/\//.test(c.picURL || '') ? c.picURL : '',
-                dk: Number.isFinite(bas) ? Math.max(0, Math.floor((simdi - bas) / 60000)) : null,
-                neden: knNeden(c) });
-        }
+        if (g === 'mesgul') mola.push({ id: k.id, ad: k.ad, foto: k.foto, dk: k.dk, neden: k.neden });
     });
     const aktif = sayi.musait + sayi.sipariste + sayi.donen;
-    return { planlanan, aktif, eksik: Math.max(0, planlanan - aktif), sayi, mola, zaman: simdi };
+    return { planlanan, aktif, eksik: Math.max(0, planlanan - aktif), sayi, mola, kuryeler: liste, zaman: simdi };
+}
+
+/** "Siparişte" bir kod aralığı: kuryenin aralığa girdiği an izlenir */
+async function knGrupTakip(sonuc) {
+    let eski = {};
+    try { eski = (await chrome.storage.session.get(KN_GRUP))[KN_GRUP] || {}; } catch (e) { eski = {}; }
+    const yeni = {};
+    const simdi = sonuc.zaman;
+    sonuc.kuryeler.forEach((k) => {
+        if (!(k.status >= 400 && k.status <= 800)) return;
+        const o = eski[k.id];
+        k.grupBas = o && Number.isFinite(o) ? o : (k.bas != null ? k.bas : simdi);
+        yeni[k.id] = k.grupBas;
+        k.dkGrup = Math.max(0, Math.floor((simdi - k.grupBas) / 60000));
+    });
+    try { await chrome.storage.session.set({ [KN_GRUP]: yeni }); } catch (e) { /* sessiz */ }
 }
 
 async function knErteleOku() {
@@ -176,14 +224,27 @@ async function knUyari(sonuc, sim) {
     const e = await knErteleOku();
     const simdi = Date.now();
     const eksikGoster = !!sonuc && knAyar.eksik && sonuc.eksik > 0 && (sim || !(e.eksik > simdi));
-    const mola = !sonuc || !knAyar.mola ? [] : sonuc.mola
-        .filter((m) => m.dk != null && m.dk >= knAyar.molaDk && (sim || !((e.mola || {})[m.id] > simdi)))
-        .sort((a, b) => b.dk - a.dk);
+    const uzun = [];
+    if (sonuc && knAyar.mola) {
+        (sonuc.kuryeler || []).forEach((k) => {
+            for (const x of KN_ADIMLAR) {
+                const esik = knAyar.esik[x.ad];
+                if (!esik || !x.tut(k.status)) continue;
+                const dk = x.grup ? k.dkGrup : k.dk;
+                if (dk == null || dk < esik) continue;
+                const id = k.id + ':' + x.ad;
+                if (!sim && (e.mola || {})[id] > simdi) break;
+                uzun.push({ id, ad: k.ad, foto: k.foto, dk, fiil: x.fiil, neden: x.ad === 'mesgul' ? k.neden : '' });
+                break;
+            }
+        });
+    }
+    uzun.sort((a, b) => b.dk - a.dk);
     return {
         type: 'JBA_KURYE_UYARI', sim: !!sim,
         eksik: eksikGoster ? { planlanan: sonuc.planlanan, aktif: sonuc.aktif, eksik: sonuc.eksik, sayi: sonuc.sayi,
             mesgul: sonuc.mola.slice().sort((a, b) => (b.dk || 0) - (a.dk || 0)) } : null,
-        mola, zaman: simdi,
+        mola: uzun, zaman: simdi,
     };
 }
 
@@ -214,7 +275,6 @@ async function knKontrol(zorla) {
     if (!knAyar.acik) return;
     if (!zorla && !knMesaiMi()) return;
     if (!zorla && Date.now() - knSonKontrol < knAyar.sn * 1000) return;
-    if (Date.now() < knSimBitis) return;
     const sekmeler = await knPanoSekmeleri();
     if (!sekmeler.length) return; // uyarı gösterilecek yer yoksa istek de yok
     knCalisiyor = true;
@@ -228,6 +288,7 @@ async function knKontrol(zorla) {
         const plan = await knGetir(o, '/warehouses/courier-plan/' + sehir + '?currentDate=' + saatBasi.getTime());
         const kur = await knGetir(o, '/courier/filter', { isLoggedIn: true });
         knSon = knHesapla(plan, kur && kur.couriers, o.depo, Date.now());
+        await knGrupTakip(knSon);
         const mesaj = await knUyari(knSon, false);
         await knYay(mesaj, sekmeler);
         await knSes(mesaj);
@@ -242,22 +303,55 @@ async function knKontrol(zorla) {
 /* Sipariş panosu nöbetçisi her 2 sn çağırır (arka-plan/pano-nobet.js) */
 globalThis.jbaKuryeNabiz = function () { knKontrol(false); };
 
-/* Simülasyon: örnek veriyle (gerçek kurye adı yok) 20 sn göster, sesi çal */
+/* Simülasyon: her basışta rastgele bir durum. Oturum varsa depodaki gerçek
+   kuryelerin ad ve fotoğrafı kullanılır (yalnız ekranda, hiçbir yere yazılmaz),
+   durum, süre ve neden uydurulur. Kart çarpıya basılana kadar durur. */
+const KN_SIM_NEDEN = ['Yemek Molası', 'Yakıt Alımı', 'Kısa Mola', 'Araç Bakımı'];
+const KN_SIM_AD = ['Örnek Kurye', 'Deneme Kurye', 'Test Kurye', 'Yedek Kurye', 'Gece Kurye', 'Hafta Sonu Kurye'];
+const knRast = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
+const knSec = (d) => d[Math.floor(Math.random() * d.length)];
+
+async function knSimKuryeler() {
+    try {
+        const sekmeler = await knPanoSekmeleri();
+        const o = await knOturum(sekmeler);
+        if (o.hata) return [];
+        const kur = await knGetir(o, '/courier/filter', { isLoggedIn: true });
+        return (kur && Array.isArray(kur.couriers) ? kur.couriers : []).map((k) => (k && k.courier) || k)
+            .filter((c) => c && c.warehouse === o.depo)
+            .map((c) => ({ id: String(c._id || ''), ad: String(c.name || 'Kurye').slice(0, 60), foto: /^https:\/\//.test(c.picURL || '') ? c.picURL : '' }));
+    } catch (e) { return []; }
+}
+
 async function knSimulasyon() {
     await knAyarOku();
     const sekmeler = await knPanoSekmeleri();
     if (!sekmeler.length) return { ok: false, metin: 'Depo panelinin sipariş ekranı açık değil.' };
-    knSimBitis = Date.now() + KN_SIM_MS;
-    const ornek = {
-        planlanan: 6, aktif: 5, eksik: 1, sayi: { toplam: 7, musait: 2, sipariste: 2, donen: 1, mesgul: 2 },
-        mola: [{ id: 'ornek-1', ad: 'Örnek Kurye', foto: '', dk: knAyar.molaDk + 12, neden: 'Yemek Molası' },
-            { id: 'ornek-2', ad: 'Deneme Kurye', foto: '', dk: 8, neden: 'Yakıt Alımı' }],
-    };
-    const mesaj = await knUyari(ornek, true);
+    let kisiler = await knSimKuryeler();
+    if (kisiler.length < 3) kisiler = kisiler.concat(KN_SIM_AD.map((ad, i) => ({ id: 'sim-' + i, ad, foto: '' })));
+    kisiler = kisiler.sort(() => Math.random() - 0.5).slice(0, knRast(3, Math.min(8, kisiler.length)));
+    const simdi = Date.now();
+    // Açık eşiklerden birkaçını aşan kurye olsun, gerisi rastgele
+    const acikAdim = KN_ADIMLAR.filter((x) => knAyar.esik[x.ad]).sort(() => Math.random() - 0.5);
+    const kodu = { mesgul: 200, toplama: 600, yolda: 700, adreste: 800, donen: 900, sipariste: knSec([400, 600, 700, 800]) };
+    const liste = kisiler.map((k, i) => {
+        let status, dk;
+        const asan = i < Math.min(acikAdim.length, knRast(1, 2)) ? acikAdim[i] : null;
+        if (asan) { status = kodu[asan.ad]; dk = knAyar.esik[asan.ad] + knRast(1, 25); }
+        else { status = knSec([100, 100, 200, 600, 700, 800, 900]); dk = knRast(1, 9); }
+        const kayit = Object.assign({}, k, { status, bas: simdi - dk * 60000, neden: status === 200 ? knSec(KN_SIM_NEDEN) : '' });
+        if (status >= 400 && status <= 800) kayit.grupBas = kayit.bas;
+        return kayit;
+    });
+    // En az bir meşgul olsun ki kartta meşgul listesi görünsün
+    if (!liste.some((k) => k.status === 200)) { const k = liste[liste.length - 1]; k.status = 200; k.neden = knSec(KN_SIM_NEDEN); }
+    const ozet = knOzet(0, liste, simdi);
+    ozet.planlanan = ozet.aktif + knRast(1, 2);
+    ozet.eksik = ozet.planlanan - ozet.aktif;
+    const mesaj = await knUyari(ozet, true);
     mesaj.sure = KN_SIM_MS;
     await knYay(mesaj, sekmeler);
     if (knAyar.sesAcik && typeof globalThis.jbaSesCal === 'function') globalThis.jbaSesCal(knAyar.ses, 2, 0);
-    setTimeout(() => { knSimBitis = 0; knSonKontrol = 0; knKontrol(true); }, KN_SIM_MS + 200);
     return { ok: true };
 }
 

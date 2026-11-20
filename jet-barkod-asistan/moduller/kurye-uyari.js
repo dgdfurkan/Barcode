@@ -26,6 +26,7 @@
     var son = null;
     var gizliImza = '';
     var simZaman = null;
+    var gercek = null; // simülasyon ekrandayken gelen son gerçek uyarı
 
     var IKON_KURYE = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="17" r="3"/><circle cx="18" cy="17" r="3"/><path d="M9 17h6M13 7h3l2.5 10M6 14l3-5h5"/></svg>';
     var IKON_SAAT = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/></svg>';
@@ -60,13 +61,13 @@
         '.sayi { display: flex; align-items: baseline; gap: 6px; margin: 2px 0 0; }',
         '.sayi b { font-size: 26px; line-height: 30px; font-weight: 800; color: var(--yazi); font-variant-numeric: tabular-nums; }',
         '.sayi span { font-size: 13px; font-weight: 700; color: var(--yazi); }',
-        '.mesgul { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }',
-        '.mesgul li { display: flex; align-items: center; gap: 8px; min-width: 0; font-size: 12px; line-height: 16px; }',
+        '.mesgul { list-style: none; margin: 10px 0 0; padding: 0; display: grid; grid-template-columns: 24px minmax(0, 1fr) auto auto; column-gap: 8px; row-gap: 6px; align-items: center; font-size: 12px; line-height: 16px; }',
+        '.mesgul li { display: contents; }',
         '.mini { flex: none; width: 24px; height: 24px; border-radius: 999px; object-fit: cover; background: var(--zemin); color: var(--yazi); display: grid; place-items: center; font-size: 10px; font-weight: 800; }',
         '.mesgul__ad { flex: 1; min-width: 0; font-weight: 700; color: #111827; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }',
-        '.mesgul__neden { flex: none; color: #475467; font-variant-numeric: tabular-nums; white-space: nowrap; }',
-        '.mesgul__neden b { font-weight: 700; color: var(--yazi); }',
-        '.mesgul__daha { color: #667085; font-weight: 600; padding-left: 32px; }',
+        '.mesgul__neden { font-weight: 700; color: var(--yazi); white-space: nowrap; }',
+        '.mesgul__sure { color: #475467; font-variant-numeric: tabular-nums; white-space: nowrap; text-align: right; }',
+        '.mesgul__daha { grid-column: 2 / -1; color: #667085; font-weight: 600; }',
         '.neden { display: block; margin-top: 2px; font-size: 12px; line-height: 16px; font-weight: 600; color: #475467; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }',
         '.tablo { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 10px; }',
         '.hucre { padding: 6px 8px; border-radius: 9px; background: #f8fafc; text-align: center; }',
@@ -121,20 +122,15 @@
             : '<span class="' + sinif + '">' + kacir(bas(m.ad)) + '</span>';
     }
 
-    function nedenSure(m) {
-        var p = [];
-        if (m.neden) p.push('<b>' + kacir(m.neden) + '</b>');
-        if (m.dk != null) p.push(sureYaz(m.dk));
-        return p.join(' · ') || 'Meşgul';
-    }
-
     function eksikHtml(e, sim) {
         var s = e.sayi || {};
         var liste = Array.isArray(e.mesgul) ? e.mesgul : [];
         var gor = liste.slice(0, 4);
         var mesgulHtml = gor.length ? '<ul class="mesgul">' + gor.map(function (m) {
-            return '<li>' + fotoHtml(m, 'mini') + '<span class="mesgul__ad">' + kacir(m.ad) + '</span><span class="mesgul__neden">' + nedenSure(m) + '</span></li>';
-        }).join('') + (liste.length > gor.length ? '<li class="mesgul__daha">+' + (liste.length - gor.length) + ' kurye daha meşgul</li>' : '') + '</ul>' : '';
+            return '<li>' + fotoHtml(m, 'mini') + '<span class="mesgul__ad">' + kacir(m.ad) + '</span>' +
+                '<span class="mesgul__neden">' + kacir(m.neden || 'Meşgul') + '</span>' +
+                '<span class="mesgul__sure">' + (m.dk != null ? sureYaz(m.dk) : '') + '</span></li>';
+        }).join('') + (liste.length > gor.length ? '<li><span class="mesgul__daha">+' + (liste.length - gor.length) + ' kurye daha meşgul</span></li>' : '') + '</ul>' : '';
         return '<section class="kart kart--eksik" role="alert">' +
             '<div class="ust"><span class="ikon">' + IKON_KURYE + '</span>' +
             '<div class="metin"><p class="baslik">Kurye Eksiğiniz Var' + (sim ? '<span class="sim">SİMÜLASYON</span>' : '') + '</p>' +
@@ -150,7 +146,7 @@
         return '<section class="kart kart--mola">' +
             '<div class="ust"><div class="kisi">' + fotoHtml(m, 'foto') +
             '<div class="metin"><p class="baslik">' + kacir(m.ad) + '</p>' +
-            '<span class="sure">' + IKON_SAAT + sureYaz(m.dk) + "'dır meşgulde</span>" +
+            '<span class="sure">' + IKON_SAAT + sureYaz(m.dk) + "'dır " + kacir(m.fiil || 'meşgulde') + '</span>' +
             (m.neden ? '<span class="neden">' + kacir(m.neden) + '</span>' : '') +
             (sim ? '<span class="sim sim--alt">SİMÜLASYON</span>' : '') + '</div></div>' +
             '<button type="button" class="kapat" data-kapat aria-label="Gizle">' + IKON_X + '</button></div>' +
@@ -187,6 +183,7 @@
         var b = e.target.closest('button');
         if (!b) return;
         if (b.hasAttribute('data-kapat')) {
+            if (son && son.sim) { simBitir(); return; }
             gizliImza = imza(son);
             kaldir();
             return;
@@ -195,11 +192,23 @@
         if (!tur) return;
         var kart = b.closest('.kart');
         if (kart) kart.style.opacity = '0.4';
-        if (son && son.sim) { if (kart) kart.remove(); return; }
+        if (son && son.sim) {
+            if (kart) kart.remove();
+            if (kok && !kok.querySelector('.kart')) simBitir();
+            return;
+        }
         try {
             chrome.runtime.sendMessage({ type: 'JBA_KURYE_ERTELE', tur: tur, id: b.getAttribute('data-id') || '', dk: Number(b.getAttribute('data-dk')) || 15 },
                 function () { void chrome.runtime.lastError; });
         } catch (x) { /* yetim bağlam */ }
+    }
+
+    /* Simülasyon çarpıyla (ya da 10 dk sonra) biter, varsa gerçek uyarı geri gelir */
+    function simBitir() {
+        clearTimeout(simZaman);
+        son = null;
+        kaldir();
+        if (gercek) ciz(gercek);
     }
 
     try {
@@ -207,12 +216,13 @@
             if (!m || m.type !== 'JBA_KURYE_UYARI') return false;
             var veri = { eksik: m.eksik || null, mola: Array.isArray(m.mola) ? m.mola : [], sim: !!m.sim };
             if (veri.sim) {
-                var onceki = son && !son.sim ? son : null;
+                if (son && !son.sim) gercek = son;
                 ciz(veri);
                 clearTimeout(simZaman);
-                simZaman = setTimeout(function () { ciz(onceki); }, Number(m.sure) || 20000);
+                simZaman = setTimeout(simBitir, Number(m.sure) || 600000);
                 return false;
             }
+            gercek = veri;
             if (son && son.sim && kap) return false; // simülasyon ekrandayken bölünmesin
             if (imza(veri) !== gizliImza) gizliImza = '';
             ciz(veri);
@@ -223,7 +233,7 @@
     JBA.kayit({
         kimlik: 'kuryeUyari',
         ad: 'Kurye Uyarısı',
-        ozet: 'Kurye eksiği ve uzun mola olunca sol üstte haber verir.',
+        ozet: 'Kurye eksiği ve bir adımda uzun kalan kurye olunca sol üstte haber verir.',
         hostlar: ['warehouse.getir.com'],
         yol: function (yol) { return PANO_YOLU.test(yol); },
         baslat: function () {

@@ -275,16 +275,17 @@
             <div class="kat__secenekler">
               <label class="secenek"><input type="checkbox" id="kuryeAcik" checked><span>Kurye uyarısı açık</span></label>
               <label class="secenek" data-kurye="acik"><input type="checkbox" id="kuryeEksik" checked><span>Kurye eksiği kartı</span></label>
-              <label class="secenek" data-kurye="acik"><input type="checkbox" id="kuryeMola" checked><span>Uzun süre meşgulde kalan kurye</span></label>
+              <label class="secenek" data-kurye="acik"><input type="checkbox" id="kuryeMola" checked><span>Bir adımda uzun kalan kurye</span></label>
             </div>
-            <div class="satir" data-kurye="mola"><span class="satir__ad">Meşgul Eşiği</span>
-              <select class="ayar__secim" id="kuryeMolaDk" aria-label="Uzun meşgul eşiği">
-                <option value="30">30 dakika</option>
-                <option value="45">45 dakika</option>
-                <option value="60">1 saat</option>
-                <option value="90">1,5 saat</option>
-                <option value="120">2 saat</option>
-              </select>
+            <div class="esikler" data-kurye="mola">
+              <p class="ses-baslik">Süre Eşikleri</p>
+              <label class="esik"><span class="esik__ad">Meşgul</span><span class="esik__kutu"><input type="number" inputmode="numeric" min="1" max="600" step="1" placeholder="Kapalı" data-esik="mesgul" aria-label="Meşgul eşiği, dakika"><span class="esik__dk">dk</span></span></label>
+              <label class="esik"><span class="esik__ad">Toplamada</span><span class="esik__kutu"><input type="number" inputmode="numeric" min="1" max="600" step="1" placeholder="Kapalı" data-esik="toplama" aria-label="Toplamada eşiği, dakika"><span class="esik__dk">dk</span></span></label>
+              <label class="esik"><span class="esik__ad">Yolda</span><span class="esik__kutu"><input type="number" inputmode="numeric" min="1" max="600" step="1" placeholder="Kapalı" data-esik="yolda" aria-label="Yolda eşiği, dakika"><span class="esik__dk">dk</span></span></label>
+              <label class="esik"><span class="esik__ad">Adreste</span><span class="esik__kutu"><input type="number" inputmode="numeric" min="1" max="600" step="1" placeholder="Kapalı" data-esik="adreste" aria-label="Adreste eşiği, dakika"><span class="esik__dk">dk</span></span></label>
+              <label class="esik"><span class="esik__ad">Geri Dönüyor</span><span class="esik__kutu"><input type="number" inputmode="numeric" min="1" max="600" step="1" placeholder="Kapalı" data-esik="donen" aria-label="Geri Dönüyor eşiği, dakika"><span class="esik__dk">dk</span></span></label>
+              <label class="esik"><span class="esik__ad">Siparişte (toplam)</span><span class="esik__kutu"><input type="number" inputmode="numeric" min="1" max="600" step="1" placeholder="Kapalı" data-esik="sipariste" aria-label="Siparişte (toplam) eşiği, dakika"><span class="esik__dk">dk</span></span></label>
+              <p class="ayar__ozet">Kurye o adımda yazdığın dakikadan uzun kalırsa sol üstte ayrı kart çıkar. Boş bırakılan adım bildirilmez. Siparişte (toplam): onaydan teslime kadarki bütün süre.</p>
             </div>
             <p class="ayar__durum" id="kuryeDurum">Henüz kontrol yapılmadı.</p>
             <div class="kat__dugmeler">

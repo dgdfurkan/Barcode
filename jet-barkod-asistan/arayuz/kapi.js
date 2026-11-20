@@ -445,7 +445,8 @@
     }
 
     /* Kurye uyarısı (arka-plan/kurye-nobet.js okuyor; varsayılanlar orada da aynı) */
-    var KURYE_VARSAYILAN = { acik: true, sn: 15, eksik: true, mola: true, molaDk: 60, ses: 'kampana', sesAcik: true, sesAralik: 2 };
+    var KURYE_VARSAYILAN = { acik: true, sn: 15, eksik: true, mola: true, esik: { mesgul: 60 }, ses: 'kampana', sesAcik: true, sesAralik: 2 };
+    var esikKutulari = Array.prototype.slice.call(document.querySelectorAll('[data-esik]'));
     var kEl = function (id) { return document.getElementById(id); };
     if (kEl('kuryeSn')) {
         var kSes = kEl('kuryeSes');
@@ -470,7 +471,11 @@
             kEl('kuryeMola').checked = a.mola;
             kEl('kuryeSesAcik').checked = a.sesAcik;
             kEl('kuryeSn').value = String(a.sn);
-            kEl('kuryeMolaDk').value = String(a.molaDk);
+            esikKutulari.forEach(function (k) {
+                if (document.activeElement === k) return; // yazarken kutu değişmesin
+                var v = a.esik && a.esik[k.getAttribute('data-esik')];
+                k.value = v ? String(v) : '';
+            });
             kEl('kuryeSes').value = a.ses;
             kEl('kuryeSesAralik').value = String(a.sesAralik);
             kGoster('acik', a.acik);
@@ -485,19 +490,43 @@
                 sn: parseInt(kEl('kuryeSn').value, 10) || 15,
                 eksik: kEl('kuryeEksik').checked,
                 mola: kEl('kuryeMola').checked,
-                molaDk: parseInt(kEl('kuryeMolaDk').value, 10) || 60,
+                esik: esikKutulari.reduce(function (e, k) {
+                    var n = Math.round(Number(k.value));
+                    if (k.value !== '' && n >= 1 && n <= 600) e[k.getAttribute('data-esik')] = n;
+                    return e;
+                }, {}),
                 ses: kEl('kuryeSes').value || 'kampana',
                 sesAcik: kEl('kuryeSesAcik').checked,
                 sesAralik: parseInt(kEl('kuryeSesAralik').value, 10) || 2
             };
         };
         chrome.storage.local.get('jbaKurye', function (r) {
-            kFormu(Object.assign({}, KURYE_VARSAYILAN, (r && r.jbaKurye) || {}));
-            ['kuryeAcik', 'kuryeEksik', 'kuryeMola', 'kuryeSesAcik', 'kuryeSn', 'kuryeMolaDk', 'kuryeSes', 'kuryeSesAralik'].forEach(function (id) {
-                kEl(id).addEventListener('change', function () {
-                    var y = kOku();
-                    kFormu(y);
-                    chrome.storage.local.set({ jbaKurye: y });
+            var kayit = Object.assign({}, KURYE_VARSAYILAN, (r && r.jbaKurye) || {});
+            // 0.57.0'daki tek meşgul eşiği
+            if (!(r && r.jbaKurye && r.jbaKurye.esik) && r && r.jbaKurye && r.jbaKurye.molaDk) kayit.esik = { mesgul: Number(r.jbaKurye.molaDk) || 60 };
+            kFormu(kayit);
+            var kKaydet = function () {
+                var y = kOku();
+                kFormu(y);
+                chrome.storage.local.set({ jbaKurye: y });
+            };
+            ['kuryeAcik', 'kuryeEksik', 'kuryeMola', 'kuryeSesAcik', 'kuryeSn', 'kuryeSes', 'kuryeSesAralik'].forEach(function (id) {
+                kEl(id).addEventListener('change', kKaydet);
+            });
+            var esikZaman = null;
+            esikKutulari.forEach(function (k) {
+                k.addEventListener('input', function () {
+                    if (k.value.length > 3) k.value = k.value.slice(0, 3);
+                    clearTimeout(esikZaman);
+                    esikZaman = setTimeout(kKaydet, 500);
+                });
+                k.addEventListener('blur', function () {
+                    clearTimeout(esikZaman);
+                    var n = Math.round(Number(k.value));
+                    if (k.value !== '' && !(n >= 1 && n <= 600)) k.value = '';
+                    kKaydet();
+                    var v = kOku().esik[k.getAttribute('data-esik')];
+                    k.value = v ? String(v) : '';
                 });
             });
         });
