@@ -123,6 +123,15 @@ async function knSehir(o) {
     return sehir;
 }
 
+/** Meşgul nedeni: panelin seçeneği (Yemek Molası, Yakıt Alımı...) + varsa not */
+function knNeden(c) {
+    const o = c && c.lastBusyOption;
+    if (!o || typeof o !== 'object') return Number(c && c.status) >= 4000 ? 'Depo İkmali' : '';
+    const ad = String(o.tr || o.en || '').trim();
+    const not = String(o.comment || '').trim();
+    return (ad + (not && not !== ad ? ': ' + not : '')).slice(0, 60);
+}
+
 function knDurumGrubu(s) {
     s = Number(s) || 0;
     if (s === 100) return 'musait';
@@ -134,7 +143,8 @@ function knDurumGrubu(s) {
 
 /** Ham yanıtlardan uyarı verisi (Getir panelinin kendi sayımıyla) */
 function knHesapla(plan, kuryeler, depo, simdi) {
-    const p = (plan && Array.isArray(plan.warehouse) ? plan.warehouse : []).find((x) => (x.warehouseId || (x.warehouse && x.warehouse._id) || x.warehouse) === depo);
+    const adaylar = (plan && Array.isArray(plan.warehouse) ? plan.warehouse : []).filter((x) => (x.warehouseId || (x.warehouse && x.warehouse._id) || x.warehouse) === depo);
+    const p = adaylar.find((x) => Date.parse(x.startDate) <= simdi && simdi < Date.parse(x.endDate)) || adaylar[0];
     const planlanan = p && p.courierPlanByCourierType
         ? Object.values(p.courierPlanByCourierType).reduce((t, v) => t + (Number(v) || 0), 0) : 0;
     const sayi = { toplam: 0, musait: 0, sipariste: 0, donen: 0, mesgul: 0 };
@@ -147,10 +157,10 @@ function knHesapla(plan, kuryeler, depo, simdi) {
         if (g !== 'diger') sayi[g]++;
         if (g === 'mesgul') {
             const bas = Date.parse(c.statusLastChangedAt || '');
-            if (Number.isFinite(bas)) {
-                mola.push({ id: String(c._id || ''), ad: String(c.name || 'Kurye').slice(0, 60),
-                    foto: /^https:\/\//.test(c.picURL || '') ? c.picURL : '', dk: Math.max(0, Math.floor((simdi - bas) / 60000)) });
-            }
+            mola.push({ id: String(c._id || ''), ad: String(c.name || 'Kurye').slice(0, 60),
+                foto: /^https:\/\//.test(c.picURL || '') ? c.picURL : '',
+                dk: Number.isFinite(bas) ? Math.max(0, Math.floor((simdi - bas) / 60000)) : null,
+                neden: knNeden(c) });
         }
     });
     const aktif = sayi.musait + sayi.sipariste + sayi.donen;
@@ -167,11 +177,12 @@ async function knUyari(sonuc, sim) {
     const simdi = Date.now();
     const eksikGoster = !!sonuc && knAyar.eksik && sonuc.eksik > 0 && (sim || !(e.eksik > simdi));
     const mola = !sonuc || !knAyar.mola ? [] : sonuc.mola
-        .filter((m) => m.dk >= knAyar.molaDk && (sim || !((e.mola || {})[m.id] > simdi)))
+        .filter((m) => m.dk != null && m.dk >= knAyar.molaDk && (sim || !((e.mola || {})[m.id] > simdi)))
         .sort((a, b) => b.dk - a.dk);
     return {
         type: 'JBA_KURYE_UYARI', sim: !!sim,
-        eksik: eksikGoster ? { planlanan: sonuc.planlanan, aktif: sonuc.aktif, eksik: sonuc.eksik, sayi: sonuc.sayi } : null,
+        eksik: eksikGoster ? { planlanan: sonuc.planlanan, aktif: sonuc.aktif, eksik: sonuc.eksik, sayi: sonuc.sayi,
+            mesgul: sonuc.mola.slice().sort((a, b) => (b.dk || 0) - (a.dk || 0)) } : null,
         mola, zaman: simdi,
     };
 }
@@ -212,7 +223,9 @@ async function knKontrol(zorla) {
         const o = await knOturum(sekmeler);
         if (o.hata) { await knDurumYaz({ hata: o.hata }); return; }
         const sehir = await knSehir(o);
-        const plan = await knGetir(o, '/warehouses/courier-plan/' + sehir + '?currentDate=' + Date.now());
+        // Plan saatlik; panel yalnız saat başını kabul ediyor, anlık zamanla boş dönüyor
+        const saatBasi = new Date(); saatBasi.setMinutes(0, 0, 0);
+        const plan = await knGetir(o, '/warehouses/courier-plan/' + sehir + '?currentDate=' + saatBasi.getTime());
         const kur = await knGetir(o, '/courier/filter', { isLoggedIn: true });
         knSon = knHesapla(plan, kur && kur.couriers, o.depo, Date.now());
         const mesaj = await knUyari(knSon, false);
@@ -236,8 +249,9 @@ async function knSimulasyon() {
     if (!sekmeler.length) return { ok: false, metin: 'Depo panelinin sipariş ekranı açık değil.' };
     knSimBitis = Date.now() + KN_SIM_MS;
     const ornek = {
-        planlanan: 6, aktif: 5, eksik: 1, sayi: { toplam: 6, musait: 2, sipariste: 2, donen: 1, mesgul: 1 },
-        mola: [{ id: 'ornek-1', ad: 'Örnek Kurye', foto: '', dk: knAyar.molaDk + 12 }, { id: 'ornek-2', ad: 'Deneme Kurye', foto: '', dk: knAyar.molaDk + 4 }],
+        planlanan: 6, aktif: 5, eksik: 1, sayi: { toplam: 7, musait: 2, sipariste: 2, donen: 1, mesgul: 2 },
+        mola: [{ id: 'ornek-1', ad: 'Örnek Kurye', foto: '', dk: knAyar.molaDk + 12, neden: 'Yemek Molası' },
+            { id: 'ornek-2', ad: 'Deneme Kurye', foto: '', dk: 8, neden: 'Yakıt Alımı' }],
     };
     const mesaj = await knUyari(ornek, true);
     mesaj.sure = KN_SIM_MS;

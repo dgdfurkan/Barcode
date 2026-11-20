@@ -57,17 +57,23 @@
         '.kapat { flex: none; align-self: flex-start; width: 32px; height: 32px; margin: -6px -6px 0 0; border: 0; border-radius: 999px; background: transparent; color: #98a2b3; display: grid; place-items: center; }',
         '.kapat:hover { background: #f2f4f7; color: #344054; }',
         '.kapat svg { width: 16px; height: 16px; }',
-        '.sayi { display: flex; align-items: baseline; gap: 6px; margin: 10px 0 0; }',
-        '.sayi b { font-size: 30px; line-height: 34px; font-weight: 800; color: var(--yazi); font-variant-numeric: tabular-nums; }',
+        '.sayi { display: flex; align-items: baseline; gap: 6px; margin: 2px 0 0; }',
+        '.sayi b { font-size: 26px; line-height: 30px; font-weight: 800; color: var(--yazi); font-variant-numeric: tabular-nums; }',
         '.sayi span { font-size: 13px; font-weight: 700; color: var(--yazi); }',
+        '.mesgul { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }',
+        '.mesgul li { display: flex; align-items: center; gap: 8px; min-width: 0; font-size: 12px; line-height: 16px; }',
+        '.mini { flex: none; width: 24px; height: 24px; border-radius: 999px; object-fit: cover; background: var(--zemin); color: var(--yazi); display: grid; place-items: center; font-size: 10px; font-weight: 800; }',
+        '.mesgul__ad { flex: 1; min-width: 0; font-weight: 700; color: #111827; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }',
+        '.mesgul__neden { flex: none; color: #475467; font-variant-numeric: tabular-nums; white-space: nowrap; }',
+        '.mesgul__neden b { font-weight: 700; color: var(--yazi); }',
+        '.mesgul__daha { color: #667085; font-weight: 600; padding-left: 32px; }',
+        '.neden { display: block; margin-top: 2px; font-size: 12px; line-height: 16px; font-weight: 600; color: #475467; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }',
         '.tablo { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 10px; }',
         '.hucre { padding: 6px 8px; border-radius: 9px; background: #f8fafc; text-align: center; }',
         '.hucre small { display: block; font-size: 10px; line-height: 14px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: #667085; }',
         '.hucre b { font-size: 16px; line-height: 20px; font-weight: 800; font-variant-numeric: tabular-nums; }',
         '.hucre--vurgu { background: var(--zemin); }',
         '.hucre--vurgu b { color: var(--yazi); }',
-        '.dokum { margin: 8px 0 0; font-size: 12px; line-height: 16px; color: #475467; }',
-        '.dokum i { font-style: normal; font-weight: 700; color: #111827; }',
         '.kisi { flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px; }',
         '.kart--mola { padding: 12px 14px 10px; }',
         '.kart--mola .baslik { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }',
@@ -109,29 +115,44 @@
         }).join('') + '</div>';
     }
 
+    function fotoHtml(m, sinif) {
+        return /^https:\/\//.test(m.foto || '')
+            ? '<img class="' + sinif + '" src="' + kacir(m.foto) + '" alt="">'
+            : '<span class="' + sinif + '">' + kacir(bas(m.ad)) + '</span>';
+    }
+
+    function nedenSure(m) {
+        var p = [];
+        if (m.neden) p.push('<b>' + kacir(m.neden) + '</b>');
+        if (m.dk != null) p.push(sureYaz(m.dk));
+        return p.join(' · ') || 'Meşgul';
+    }
+
     function eksikHtml(e, sim) {
         var s = e.sayi || {};
+        var liste = Array.isArray(e.mesgul) ? e.mesgul : [];
+        var gor = liste.slice(0, 4);
+        var mesgulHtml = gor.length ? '<ul class="mesgul">' + gor.map(function (m) {
+            return '<li>' + fotoHtml(m, 'mini') + '<span class="mesgul__ad">' + kacir(m.ad) + '</span><span class="mesgul__neden">' + nedenSure(m) + '</span></li>';
+        }).join('') + (liste.length > gor.length ? '<li class="mesgul__daha">+' + (liste.length - gor.length) + ' kurye daha meşgul</li>' : '') + '</ul>' : '';
         return '<section class="kart kart--eksik" role="alert">' +
             '<div class="ust"><span class="ikon">' + IKON_KURYE + '</span>' +
             '<div class="metin"><p class="baslik">Kurye Eksiğiniz Var' + (sim ? '<span class="sim">SİMÜLASYON</span>' : '') + '</p>' +
-            '<p class="alt">Meşgul hariç çalışan kurye, planın altında.</p></div>' +
+            '<p class="sayi"><b>' + kacir(e.eksik) + '</b><span>Kurye Eksik</span></p></div>' +
             '<button type="button" class="kapat" data-kapat aria-label="Gizle">' + IKON_X + '</button></div>' +
-            '<p class="sayi"><b>' + kacir(e.eksik) + '</b><span>kurye eksik</span></p>' +
             '<div class="tablo"><div class="hucre"><small>Planlanan</small><b>' + kacir(e.planlanan) + '</b></div>' +
-            '<div class="hucre hucre--vurgu"><small>Aktif</small><b>' + kacir(e.aktif) + '</b></div>' +
-            '<div class="hucre"><small>Meşgul</small><b>' + kacir(s.mesgul || 0) + '</b></div></div>' +
-            '<p class="dokum">Müsait <i>' + kacir(s.musait || 0) + '</i> · Siparişte <i>' + kacir(s.sipariste || 0) + '</i> · Geri dönen <i>' + kacir(s.donen || 0) + '</i> · Toplam <i>' + kacir(s.toplam || 0) + '</i></p>' +
-            erteleHtml('eksik') + '</section>';
+            '<div class="hucre"><small>Aktif</small><b>' + kacir(e.aktif) + '</b></div>' +
+            '<div class="hucre hucre--vurgu"><small>Meşgul</small><b>' + kacir(s.mesgul || 0) + '</b></div></div>' +
+            mesgulHtml + erteleHtml('eksik') + '</section>';
     }
 
     function molaHtml(m, sim) {
-        var foto = /^https:\/\//.test(m.foto || '')
-            ? '<img class="foto" src="' + kacir(m.foto) + '" alt="">'
-            : '<span class="foto">' + kacir(bas(m.ad)) + '</span>';
         return '<section class="kart kart--mola">' +
-            '<div class="ust"><div class="kisi">' + foto +
+            '<div class="ust"><div class="kisi">' + fotoHtml(m, 'foto') +
             '<div class="metin"><p class="baslik">' + kacir(m.ad) + '</p>' +
-            '<span class="sure">' + IKON_SAAT + sureYaz(m.dk) + "'dır meşgulde</span>" + (sim ? '<span class="sim sim--alt">SİMÜLASYON</span>' : '') + '</div></div>' +
+            '<span class="sure">' + IKON_SAAT + sureYaz(m.dk) + "'dır meşgulde</span>" +
+            (m.neden ? '<span class="neden">' + kacir(m.neden) + '</span>' : '') +
+            (sim ? '<span class="sim sim--alt">SİMÜLASYON</span>' : '') + '</div></div>' +
             '<button type="button" class="kapat" data-kapat aria-label="Gizle">' + IKON_X + '</button></div>' +
             erteleHtml('mola', m.id) + '</section>';
     }

@@ -513,8 +513,7 @@
             b.textContent = saatYaz(v.zaman);
             kDurum.appendChild(b);
             var metin = v.hata ? String(v.hata)
-                : 'Planlanan ' + v.planlanan + ' · Aktif ' + v.aktif + (v.eksik > 0 ? ' · ' + v.eksik + ' eksik' : ' · tam') +
-                  (v.sayi ? ' · Meşgul ' + (v.sayi.mesgul || 0) : '') + (v.uzunMola ? ' · uzun meşgul ' + v.uzunMola : '');
+                : 'Planlanan ' + v.planlanan + ' · Aktif ' + v.aktif + ' · Meşgul ' + ((v.sayi && v.sayi.mesgul) || 0);
             kDurum.appendChild(document.createTextNode(' · ' + metin));
         };
         chrome.storage.local.get('jbaKuryeDurum', function (r) { kDurumCiz(r && r.jbaKuryeDurum); });
