@@ -44,7 +44,15 @@
         '  box-shadow: 0 20px 50px rgba(16,24,40,.18), 0 0 0 1px rgba(16,24,40,.06); animation: gir 220ms cubic-bezier(.22,1,.36,1) both; }',
         '.kart::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 5px; background: var(--vurgu); }',
         '.kart--eksik { --vurgu: #d92d20; --zemin: #fef3f2; --yazi: #b42318; }',
-        '.kart--mola { --vurgu: #dc6803; --zemin: #fffaeb; --yazi: #b54708; }',
+        '.kart--mola { --vurgu: #d97706; --zemin: #fff6e8; --yazi: #b45309; }',
+        /* Adım renkleri (css/siparisler.css token'ları): meşgul kırmızı, geri dönüyor
+           turuncu, adreste mavi, toplamada mor, yolda yeşil, siparişte lacivert */
+        '.kart--mesgul { --vurgu: #d92d20; --zemin: #fdecec; --yazi: #b42318; }',
+        '.kart--donen { --vurgu: #d97706; --zemin: #fff6e8; --yazi: #b45309; }',
+        '.kart--adreste { --vurgu: #2563eb; --zemin: #eff6ff; --yazi: #1d4ed8; }',
+        '.kart--toplama { --vurgu: #7c3aed; --zemin: #f3edff; --yazi: #6d28d9; }',
+        '.kart--yolda { --vurgu: #0e9f6e; --zemin: #eafaf4; --yazi: #047857; }',
+        '.kart--sipariste { --vurgu: #344054; --zemin: #f2f4f7; --yazi: #111827; }',
         '@keyframes gir { from { opacity: 0; transform: translateX(-12px); } to { opacity: 1; transform: none; } }',
         '.ust { display: flex; align-items: center; gap: 12px; }',
         '.ikon { flex: none; width: 40px; height: 40px; border-radius: 12px; background: var(--zemin); color: var(--yazi); display: grid; place-items: center; position: relative; }',
@@ -69,9 +77,9 @@
         '.mesgul__sure { color: #475467; font-variant-numeric: tabular-nums; white-space: nowrap; text-align: right; }',
         '.mesgul__daha { grid-column: 2 / -1; color: #667085; font-weight: 600; }',
         '.neden { display: block; margin-top: 2px; font-size: 12px; line-height: 16px; font-weight: 600; color: #475467; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }',
-        '.tablo { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 10px; }',
-        '.hucre { padding: 6px 8px; border-radius: 9px; background: #f8fafc; text-align: center; }',
-        '.hucre small { display: block; font-size: 10px; line-height: 14px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: #667085; }',
+        '.tablo { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin-top: 10px; }',
+        '.hucre { padding: 6px 4px; border-radius: 9px; background: #f8fafc; text-align: center; min-width: 0; }',
+        '.hucre small { display: block; font-size: 10px; line-height: 14px; font-weight: 700; letter-spacing: .02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-transform: uppercase; color: #667085; }',
         '.hucre b { font-size: 16px; line-height: 20px; font-weight: 800; font-variant-numeric: tabular-nums; }',
         '.hucre--vurgu { background: var(--zemin); }',
         '.hucre--vurgu b { color: var(--yazi); }',
@@ -137,13 +145,15 @@
             '<p class="sayi"><b>' + kacir(e.eksik) + '</b><span>Kurye Eksik</span></p></div>' +
             '<button type="button" class="kapat" data-kapat aria-label="Gizle">' + IKON_X + '</button></div>' +
             '<div class="tablo"><div class="hucre"><small>Planlanan</small><b>' + kacir(e.planlanan) + '</b></div>' +
+            '<div class="hucre"><small>Toplam</small><b>' + kacir(s.toplam || 0) + '</b></div>' +
             '<div class="hucre"><small>Aktif</small><b>' + kacir(e.aktif) + '</b></div>' +
             '<div class="hucre hucre--vurgu"><small>Meşgul</small><b>' + kacir(s.mesgul || 0) + '</b></div></div>' +
             mesgulHtml + erteleHtml('eksik') + '</section>';
     }
 
     function molaHtml(m, sim) {
-        return '<section class="kart kart--mola">' +
+        var adim = /^(mesgul|donen|adreste|toplama|yolda|sipariste)$/.test(m.adim || '') ? m.adim : 'mesgul';
+        return '<section class="kart kart--mola kart--' + adim + '">' +
             '<div class="ust"><div class="kisi">' + fotoHtml(m, 'foto') +
             '<div class="metin"><p class="baslik">' + kacir(m.ad) + '</p>' +
             '<span class="sure">' + IKON_SAAT + sureYaz(m.dk) + "'dır " + kacir(m.fiil || 'meşgulde') + '</span>' +

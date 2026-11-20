@@ -234,7 +234,7 @@ async function knUyari(sonuc, sim, esikler) {
                 if (dk == null || dk < esik) continue;
                 const id = k.id + ':' + x.ad;
                 if (!sim && (e.mola || {})[id] > simdi) break;
-                uzun.push({ id, ad: k.ad, foto: k.foto, dk, fiil: x.fiil, neden: x.ad === 'mesgul' ? k.neden : '' });
+                uzun.push({ id, ad: k.ad, foto: k.foto, dk, adim: x.ad, fiil: x.fiil, neden: x.ad === 'mesgul' ? k.neden : '' });
                 break;
             }
         });
