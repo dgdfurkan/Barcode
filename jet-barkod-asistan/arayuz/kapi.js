@@ -444,6 +444,100 @@
         });
     }
 
+    /* Kurye uyarısı (arka-plan/kurye-nobet.js okuyor; varsayılanlar orada da aynı) */
+    var KURYE_VARSAYILAN = { acik: true, sn: 15, eksik: true, mola: true, molaDk: 60, ses: 'kampana', sesAcik: true, sesAralik: 2 };
+    var kEl = function (id) { return document.getElementById(id); };
+    if (kEl('kuryeSn')) {
+        var kSes = kEl('kuryeSes');
+        sesGruplari.forEach(function (g) {
+            var og = document.createElement('optgroup');
+            og.label = g.baslik;
+            sesler.forEach(function (x) {
+                if (x.grup !== g.ad) return;
+                var o = document.createElement('option');
+                o.value = x.ad;
+                o.textContent = x.baslik;
+                og.appendChild(o);
+            });
+            kSes.appendChild(og);
+        });
+        var kGoster = function (ad, acik) {
+            Array.prototype.forEach.call(document.querySelectorAll('[data-kurye="' + ad + '"]'), function (e) { e.hidden = !acik; });
+        };
+        var kFormu = function (a) {
+            kEl('kuryeAcik').checked = a.acik;
+            kEl('kuryeEksik').checked = a.eksik;
+            kEl('kuryeMola').checked = a.mola;
+            kEl('kuryeSesAcik').checked = a.sesAcik;
+            kEl('kuryeSn').value = String(a.sn);
+            kEl('kuryeMolaDk').value = String(a.molaDk);
+            kEl('kuryeSes').value = a.ses;
+            kEl('kuryeSesAralik').value = String(a.sesAralik);
+            kGoster('acik', a.acik);
+            kGoster('mola', a.acik && a.mola);
+            kGoster('ses', a.sesAcik);
+            var oz = kEl('kuryeOzet');
+            if (oz) oz.textContent = a.acik ? (a.sn === 60 ? 'Dakikada bir' : a.sn + " sn'de bir") + (a.sesAcik ? '' : ' · sessiz') : 'Kapalı';
+        };
+        var kOku = function () {
+            return {
+                acik: kEl('kuryeAcik').checked,
+                sn: parseInt(kEl('kuryeSn').value, 10) || 15,
+                eksik: kEl('kuryeEksik').checked,
+                mola: kEl('kuryeMola').checked,
+                molaDk: parseInt(kEl('kuryeMolaDk').value, 10) || 60,
+                ses: kEl('kuryeSes').value || 'kampana',
+                sesAcik: kEl('kuryeSesAcik').checked,
+                sesAralik: parseInt(kEl('kuryeSesAralik').value, 10) || 2
+            };
+        };
+        chrome.storage.local.get('jbaKurye', function (r) {
+            kFormu(Object.assign({}, KURYE_VARSAYILAN, (r && r.jbaKurye) || {}));
+            ['kuryeAcik', 'kuryeEksik', 'kuryeMola', 'kuryeSesAcik', 'kuryeSn', 'kuryeMolaDk', 'kuryeSes', 'kuryeSesAralik'].forEach(function (id) {
+                kEl(id).addEventListener('change', function () {
+                    var y = kOku();
+                    kFormu(y);
+                    chrome.storage.local.set({ jbaKurye: y });
+                });
+            });
+        });
+        kEl('kuryeDinle').addEventListener('click', function () {
+            var duzey = parseInt((sesEl('sesDuzey') || {}).value, 10) || 100;
+            try { globalThis.JBASes.dur(); globalThis.JBASes.cal(kEl('kuryeSes').value, { tekrar: 2, sure: 0, duzey: duzey }); } catch (e) { /* ses yok */ }
+        });
+        var kDurum = kEl('kuryeDurum');
+        var kDurumCiz = function (v) {
+            if (!v || !v.zaman) { kDurum.textContent = 'Henüz kontrol yapılmadı.'; return; }
+            kDurum.textContent = '';
+            var b = document.createElement('b');
+            b.textContent = saatYaz(v.zaman);
+            kDurum.appendChild(b);
+            var metin = v.hata ? String(v.hata)
+                : 'Planlanan ' + v.planlanan + ' · Aktif ' + v.aktif + (v.eksik > 0 ? ' · ' + v.eksik + ' eksik' : ' · tam') +
+                  (v.sayi ? ' · Meşgul ' + (v.sayi.mesgul || 0) : '') + (v.uzunMola ? ' · uzun meşgul ' + v.uzunMola : '');
+            kDurum.appendChild(document.createTextNode(' · ' + metin));
+        };
+        chrome.storage.local.get('jbaKuryeDurum', function (r) { kDurumCiz(r && r.jbaKuryeDurum); });
+        chrome.storage.onChanged.addListener(function (d, alan) {
+            if (alan === 'local' && d.jbaKuryeDurum) kDurumCiz(d.jbaKuryeDurum.newValue);
+        });
+        var kDugme = function (id, tip, mesgul, ilk) {
+            var b = kEl(id);
+            b.addEventListener('click', function () {
+                b.disabled = true;
+                b.textContent = mesgul;
+                chrome.runtime.sendMessage({ type: tip }, function (c) {
+                    void chrome.runtime.lastError;
+                    b.textContent = c && c.ok ? 'Tamam' : 'Olmadı';
+                    if (c && !c.ok && c.metin) kDurum.textContent = c.metin;
+                    setTimeout(function () { b.disabled = false; b.textContent = ilk; }, 3000);
+                });
+            });
+        };
+        kDugme('kuryeSimdi', 'JBA_KURYE_SIMDI', 'Kontrol ediliyor...', 'Şimdi Kontrol Et');
+        kDugme('kuryeSim', 'JBA_KURYE_SIM', 'Hazırlanıyor...', 'Simülasyonu Göster');
+    }
+
     /* Sol menü: bölüm seçimi, son seçilen hatırlanır; yukarı/aşağı okla gezilir */
     var menuOgeleri = Array.prototype.slice.call(document.querySelectorAll('.menu__oge'));
     function bolumSec(ad, odakla) {

@@ -54,6 +54,8 @@ async function tur() {
     if (typeof globalThis.jbaFirinNabiz === 'function') globalThis.jbaFirinNabiz();
     // Kritik stok alarmının tekrar aralığı (firin-ses.js)
     if (typeof globalThis.jbaFirinSesNabiz === 'function') globalThis.jbaFirinSesNabiz();
+    // Kurye eksiği ve uzun mola (arka-plan/kurye-nobet.js)
+    if (typeof globalThis.jbaKuryeNabiz === 'function') globalThis.jbaKuryeNabiz();
 }
 
 function basla() {

@@ -37,6 +37,10 @@
         <svg class="menu__ikon" viewBox="0 0 20 20" aria-hidden="true"><rect x="3.5" y="4.5" width="13" height="12" rx="2"/><path d="M3.5 8.5h13M7 3v3M13 3v3M7.5 12.5l1.8 1.8 3.5-3.6"/></svg>
         <span class="menu__metin"><span class="menu__ad">Günlük Sayım</span><span class="menu__ozet" id="gunlukOzet">Bugün henüz eklenmedi</span></span>
       </button>
+      <button type="button" class="menu__oge" role="tab" data-bolum="kurye" aria-selected="false" aria-controls="bolum-kurye">
+        <svg class="menu__ikon" viewBox="0 0 20 20" aria-hidden="true"><circle cx="5.5" cy="14" r="2.5"/><circle cx="14.5" cy="14" r="2.5"/><path d="M8 14h4M11 5.5h2.5l1.8 8.5M5.5 11.5 8 8h4"/></svg>
+        <span class="menu__metin"><span class="menu__ad">Kurye</span><span class="menu__ozet" id="kuryeOzet">15 sn'de bir</span></span>
+      </button>
       <div class="menu__bosluk"></div>
       <a class="menu__site" id="siteBag" href="https://jetbarkod.com.tr/arama/" target="_blank" rel="noopener">
         <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M11 4h5v5M16 4l-7 7M14 11.5V15a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h3.5"/></svg>
@@ -252,6 +256,61 @@
         <button type="button" class="eylem" id="gunlukSimSabah">08:00 Kartı</button>
         <button type="button" class="eylem" id="gunlukSimGece">Gece Uyarısı</button>
       </div>
+          </div>
+        </div>
+      </section>
+      <section class="bolum" id="bolum-kurye" role="tabpanel" data-bolum="kurye" hidden>
+        <header class="bolum__bas"><h2>Kurye</h2><p>Kontrol panelinde sol üstte haber verir. Depo paneli açıkken, 08:00-01:00 arası. Sayılar franchise panelinin Canlı Harita'sıyla aynı.</p></header>
+        <div class="kart">
+          <div class="kart__bas"><h3>Kurye Uyarısı</h3><p>Aktif kurye (müsait + siparişte + geri dönen) planlanandan azsa uyarır. Meşgul sayılmaz.</p></div>
+          <div class="kart__govde">
+            <div class="satir"><span class="satir__ad">Kontrol Sıklığı</span>
+              <select class="ayar__secim" id="kuryeSn" aria-label="Kurye kontrol sıklığı">
+                <option value="15">15 sn</option>
+                <option value="20">20 sn</option>
+                <option value="30">30 sn</option>
+                <option value="60">1 dk</option>
+              </select>
+            </div>
+            <div class="kat__secenekler">
+              <label class="secenek"><input type="checkbox" id="kuryeAcik" checked><span>Kurye uyarısı açık</span></label>
+              <label class="secenek" data-kurye="acik"><input type="checkbox" id="kuryeEksik" checked><span>Kurye eksiği kartı</span></label>
+              <label class="secenek" data-kurye="acik"><input type="checkbox" id="kuryeMola" checked><span>Uzun süre meşgulde kalan kurye</span></label>
+            </div>
+            <div class="satir" data-kurye="mola"><span class="satir__ad">Meşgul Eşiği</span>
+              <select class="ayar__secim" id="kuryeMolaDk" aria-label="Uzun meşgul eşiği">
+                <option value="30">30 dakika</option>
+                <option value="45">45 dakika</option>
+                <option value="60">1 saat</option>
+                <option value="90">1,5 saat</option>
+                <option value="120">2 saat</option>
+              </select>
+            </div>
+            <p class="ayar__durum" id="kuryeDurum">Henüz kontrol yapılmadı.</p>
+            <div class="kat__dugmeler">
+              <button type="button" class="eylem" id="kuryeSimdi">Şimdi Kontrol Et</button>
+              <button type="button" class="eylem" id="kuryeSim">Simülasyonu Göster</button>
+            </div>
+          </div>
+        </div>
+        <div class="kart" data-kurye="acik">
+          <div class="kart__bas"><h3>Kurye Sesi</h3><p>Yeni uyarıda hemen, uyarı sürdükçe seçilen aralıkla çalar. Ertelenen kart çalmaz.</p></div>
+          <div class="kart__govde ses-govde">
+            <label class="secenek"><input type="checkbox" id="kuryeSesAcik" checked><span>Ses çalsın</span></label>
+            <div class="ses-satir" data-kurye="ses">
+              <label class="ses-satir__ad" for="kuryeSes">Ses</label>
+              <select class="ayar__secim" id="kuryeSes"></select>
+              <button type="button" class="eylem ses-dinle" id="kuryeDinle" aria-label="Kurye sesini dinle">Dinle</button>
+            </div>
+            <div class="ses-satir" data-kurye="ses">
+              <label class="ses-satir__ad" for="kuryeSesAralik">Tekrar</label>
+              <select class="ayar__secim" id="kuryeSesAralik">
+                <option value="1">1 dk</option>
+                <option value="2">2 dk</option>
+                <option value="5">5 dk</option>
+                <option value="10">10 dk</option>
+              </select>
+            </div>
           </div>
         </div>
       </section>

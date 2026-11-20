@@ -178,6 +178,17 @@ async function cal(ses, tekrar, sure, metin) {
     return false;
 }
 
+/** Başka nöbetçiler (kurye uyarısı) için: aynı görünmez ses belgesiyle çalar */
+globalThis.jbaSesCal = async function (ses, tekrar, sure, duzey) {
+    try {
+        if (!(await sesBelgesi())) return false;
+        const c = await chrome.runtime.sendMessage({ type: 'JBA_SES_CAL', hedef: 'ses-belgesi', ses, tekrar, sure, duzey: duzey || ayar.duzey || 100 });
+        return !!(c && c.ok);
+    } catch (e) {
+        return false;
+    }
+};
+
 /** Dakika cinsinden saat (yerel) */
 function gunDakikasi(d = new Date()) {
     return d.getHours() * 60 + d.getMinutes();
