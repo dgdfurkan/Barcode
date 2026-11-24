@@ -225,7 +225,7 @@
         yukleniyor: null,
         dbYok: false,
         kayitlar: new Map(), // alt kategori adı -> { getir_id, cekildi_at, urun_sayisi }
-        ayar: { sure: 30, ogrenilen: {}, sifirAlma: false, sistemDoldur: false, elDurum: {} },
+        ayar: { sure: 30, ogrenilen: {}, sifirAlma: false, sistemDoldur: false, sayilanKoru: true, elDurum: {} },
         mod: false,
         secili: null,
         filtre: 'tumu',
@@ -453,6 +453,7 @@
             if (ay.ogrenilen && typeof ay.ogrenilen === 'object') { d.ayar.ogrenilen = Object.assign({}, ay.ogrenilen, d.ayar.ogrenilen); sikiDizin = null; }
             if (typeof ay.sifirAlma === 'boolean') d.ayar.sifirAlma = ay.sifirAlma;
             if (typeof ay.sistemDoldur === 'boolean') d.ayar.sistemDoldur = ay.sistemDoldur;
+            if (typeof ay.sayilanKoru === 'boolean') d.ayar.sayilanKoru = ay.sayilanKoru;
             elDurumBirlestir(ay.elDurum);
             depoBirlestir(ay.depo);
             if (SURELER.indexOf(Number(ay.sure)) >= 0) d.ayar.sure = Number(ay.sure);
@@ -504,6 +505,7 @@
                         if (ay.ogrenilen && typeof ay.ogrenilen === 'object') { d.ayar.ogrenilen = Object.assign({}, ay.ogrenilen, d.ayar.ogrenilen); sikiDizin = null; }
                         if (typeof ay.sifirAlma === 'boolean') d.ayar.sifirAlma = ay.sifirAlma;
                         if (typeof ay.sistemDoldur === 'boolean') d.ayar.sistemDoldur = ay.sistemDoldur;
+                        if (typeof ay.sayilanKoru === 'boolean') d.ayar.sayilanKoru = ay.sayilanKoru;
                         if (elDurumBirlestir(ay.elDurum, true)) ayarYerelde = true;
                         if (!ay.depo && d.ayar.depo) ayarYerelde = true;
                         else if (depoBirlestir(ay.depo)) ayarYerelde = true;
@@ -620,7 +622,7 @@
             var anahtarlar = Object.keys(og);
             if (anahtarlar.length > 800) anahtarlar.slice(0, anahtarlar.length - 800).forEach(function (k) { delete og[k]; });
             window.jbDb.from('sayim_dongu').upsert({
-                username: kullanici(), anahtar: '_ayar', ayar: { sure: d.ayar.sure, ogrenilen: og, sifirAlma: d.ayar.sifirAlma, sistemDoldur: d.ayar.sistemDoldur, elDurum: d.ayar.elDurum, depo: d.ayar.depo || null }, guncellendi_at: new Date().toISOString(),
+                username: kullanici(), anahtar: '_ayar', ayar: { sure: d.ayar.sure, ogrenilen: og, sifirAlma: d.ayar.sifirAlma, sistemDoldur: d.ayar.sistemDoldur, sayilanKoru: d.ayar.sayilanKoru, elDurum: d.ayar.elDurum, depo: d.ayar.depo || null }, guncellendi_at: new Date().toISOString(),
             }, { onConflict: 'username,anahtar' }).then(function (r) {
                 if (r && r.error && tabloEksikMi(r.error)) d.dbYok = true;
             });
@@ -678,6 +680,25 @@
      * gercek: kullanıcının saydıkları. Çekimde yazılan 0 / 0'lar durumu değiştirmez;
      * çekimden sonra girilen 0 gerçek sayımdır.
      */
+    function gercekSayimMi(e, cekildi) {
+        if (!e || typeof e !== 'object') return false;
+        if (e.warehouseStock === null || e.warehouseStock === undefined) return false;
+        var ms = Date.parse(e.warehouseStockAt || e.lastUpdated || '') || 0;
+        return !(Number(e.warehouseStock) === 0 && Number(e.systemStock) === 0 && (!cekildi || ms <= cekildi + 60000));
+    }
+
+    /** Kullanıcının depo adedi girdiği ürünler (otomatik 0 / 0'lar hariç) */
+    function sayilanlar(ad) {
+        var s = cs();
+        var t = tabloVerisi(ad);
+        if (!s || !t) return [];
+        var cekildi = Date.parse((d.kayitlar.get(ad) || {}).cekildi_at || '') || 0;
+        return Object.keys(t).filter(function (k) {
+            if (s.isReservedCountingKey && s.isReservedCountingKey(k)) return false;
+            return gercekSayimMi(t[k], cekildi);
+        });
+    }
+
     function istatistik(ad) {
         var s = cs();
         var t = tabloVerisi(ad);
@@ -694,9 +715,8 @@
             toplam++;
             if (e.warehouseStock === null || e.warehouseStock === undefined) return;
             sayilan++;
+            if (!gercekSayimMi(e, cekildi)) return;
             var ms = Date.parse(e.warehouseStockAt || e.lastUpdated || '') || 0;
-            var otomatik = Number(e.warehouseStock) === 0 && Number(e.systemStock) === 0 && (!cekildi || ms <= cekildi + 60000);
-            if (otomatik) return;
             gercek++;
             if (ms > son) son = ms;
         });
@@ -1193,7 +1213,7 @@
     // ------------------------------------------------------------------
     // Ürünleri çek: seçenek penceresi
     // ------------------------------------------------------------------
-    /** @returns {Promise<{sifirAlma:boolean, sistemDoldur:boolean}|null>} null = vazgeçildi */
+    /** @returns {Promise<{sifirAlma:boolean, sistemDoldur:boolean, koru:boolean}|null>} null = vazgeçildi */
     function cekPenceresi(ad) {
         return new Promise(function (coz) {
             var st = istatistik(ad);
@@ -1214,19 +1234,30 @@
                 '<h2 class="sd-pencere__baslik" id="sdPencereBaslik">' + kacir(ad) + '</h2>' +
                 '<p class="sd-pencere__metin">' + IPUCU_ILK + '</p>' +
                 '<div class="sd-anahtarlar">' +
+                (sifirla ? anahtar('koru', 'Sayılanları Koru', d.ayar.sayilanKoru) : '') +
                 anahtar('sifir', 'Stoğu Olmayanları Alma', secenek) +
                 anahtar('sistem', 'Sistem Stoğunu Otomatik Doldur', d.ayar.sistemDoldur) +
                 '</div>' +
-                (sifirla ? '<p class="sd-pencere__uyari">Bu tabloda ' + st.gercek + ' ürün sayılmış. Devam ederseniz tablo yenilenir: depo ve sistem stokları sıfırlanır, artık satışta olmayan ürünler listeden çıkar.</p>' : '') +
+                (sifirla ? '<p class="sd-pencere__uyari" data-sd-uyari></p>' : '') +
                 '<div class="sd-pencere__eylem">' +
                 '<button type="button" class="sd-dugme sd-dugme--ikincil" data-sd-p="vazgec">Vazgeç</button>' +
-                '<button type="button" class="sd-dugme sd-dugme--ana" data-sd-p="cek">' + SVG.indir + '<span>' + (sifirla ? 'Sıfırla ve Çek' : 'Ürünleri Çek') + '</span></button>' +
+                '<button type="button" class="sd-dugme sd-dugme--ana" data-sd-p="cek">' + SVG.indir + '<span data-sd-cek>Ürünleri Çek</span></button>' +
                 '</div></div>';
             document.body.appendChild(pencere);
             document.documentElement.classList.add('sd-kilit');
             var kutu = pencere.querySelector('[data-sd-sifir]');
             var sistemKutu = pencere.querySelector('[data-sd-sistem]');
+            var koruKutu = pencere.querySelector('[data-sd-koru]');
             var aciklamaYaz = function () {
+                if (koruKutu) {
+                    pencere.querySelector('[data-sd-aciklama="koru"]').textContent = koruKutu.checked
+                        ? 'Depo adedi girilmiş ürünlerin depo ve sistem stoğu değişmez, eksik ve fazlası olduğu gibi kalır.'
+                        : 'Tablo baştan kurulur, girilmiş depo adetleri de silinir.';
+                    pencere.querySelector('[data-sd-uyari]').textContent = koruKutu.checked
+                        ? 'Bu tabloda ' + st.gercek + ' ürün sayılmış, bunlar korunur. Depo adedi girilmemiş ürünler yeniden çekilir, artık satışta olmayanlar listeden çıkar.'
+                        : 'Bu tabloda ' + st.gercek + ' ürün sayılmış. Devam ederseniz tablo yenilenir: depo ve sistem stokları sıfırlanır, artık satışta olmayan ürünler listeden çıkar.';
+                }
+                pencere.querySelector('[data-sd-cek]').textContent = sifirla && !(koruKutu && koruKutu.checked) ? 'Sıfırla ve Çek' : 'Ürünleri Çek';
                 pencere.querySelector('[data-sd-aciklama="sifir"]').textContent = kutu.checked
                     ? 'Stoğu 0 olan ürünler tabloya eklenmez.'
                     : 'Stoğu 0 olan ürünler listenin sonuna eklenir ve sayılmış kabul edilir; depo ve sistem stoğu 0 yazılır.';
@@ -1237,6 +1268,7 @@
             aciklamaYaz();
             kutu.addEventListener('change', aciklamaYaz);
             sistemKutu.addEventListener('change', aciklamaYaz);
+            if (koruKutu) koruKutu.addEventListener('change', aciklamaYaz);
             var bitir = function (sonuc) {
                 document.removeEventListener('keydown', tus, true);
                 pencere.classList.remove('is-acik');
@@ -1247,10 +1279,11 @@
                 if (sonuc) {
                     d.ayar.sifirAlma = kutu.checked;
                     d.ayar.sistemDoldur = sistemKutu.checked;
+                    if (koruKutu) d.ayar.sayilanKoru = koruKutu.checked;
                     ayarYaz();
                 }
                 try { if (acan && acan.focus) acan.focus({ preventScroll: true }); } catch (e) { /* yok */ }
-                coz(sonuc ? { sifirAlma: kutu.checked, sistemDoldur: sistemKutu.checked } : null);
+                coz(sonuc ? { sifirAlma: kutu.checked, sistemDoldur: sistemKutu.checked, koru: !!(koruKutu && koruKutu.checked) } : null);
             };
             var tus = function (e) {
                 if (e.key === 'Escape') { e.stopPropagation(); bitir(false); return; }
@@ -1458,10 +1491,14 @@
             var hedef = tabloAdi(ad);
             if (!tabloVarMi(ad)) await s.createTable(hedef, { skipRender: true });
             else if (s.currentTableName !== hedef) await s.switchTable(hedef, { skipCatchUp: true, skipRender: true });
-            await s.applyDonguProducts(items, { tablo: hedef });
+            var korunan = secim.koru ? sayilanlar(ad) : [];
+            var yazim = await s.applyDonguProducts(items, { tablo: hedef, koru: korunan });
 
-            await kayitYaz(ad, { getir_id: kullanilan, cekildi_at: new Date().toISOString(), urun_sayisi: items.length });
-            var parca = [items.length + ' ürün tabloya eklendi.'];
+            var toplamUrun = (yazim && yazim.added) || items.length;
+            await kayitYaz(ad, { getir_id: kullanilan, cekildi_at: new Date().toISOString(), urun_sayisi: toplamUrun });
+            var parca = [korunan.length
+                ? (toplamUrun - korunan.length) + ' ürün yenilendi, sayılmış ' + korunan.length + ' ürün korundu.'
+                : items.length + ' ürün tabloya eklendi.'];
             if (sistemDoldur) parca.push('Sistem stokları mevcut stoktan dolduruldu.');
             if (sifir.length) parca.push(sifirAlma
                 ? 'Stoğu olmayan ' + sifir.length + ' ürün eklenmedi.'

@@ -9128,9 +9128,11 @@ class CountingSystem {
      * Tablo tamamen yenilenir: listede olmayan ürünler silinir, kalanların depo ve
      * sistem stoğu sıfırlanır, sıra Getir'in sırası (stok çoktan aza) olur. Fiyat
      * yanıttan gelir. Yol applyImportedRows ile aynı: tablo kilidi, sıra, toplu kayıt.
+     * options.koru: depo ve sistem stoğuna dokunulmayan ürünler; Getir listesinde
+     * olmasalar da tabloda kalır (sona eklenir), yalnız boş sistem stoğu doldurulur.
      *
      * @param {Array<{product:object, row:object}>} items
-     * @param {{tablo:string, kaynak?:string}} options tablo aktif tabloyla aynı olmalı
+     * @param {{tablo:string, kaynak?:string, koru?:string[]}} options tablo aktif tabloyla aynı olmalı
      */
     async applyDonguProducts(items, options = {}) {
         if (!Array.isArray(items) || items.length === 0) throw new Error('Yazılacak ürün yok');
@@ -9143,17 +9145,25 @@ class CountingSystem {
             }
             const ids = [];
             const seen = new Set();
+            const korunan = new Set((options.koru || []).filter((id) => this.countingData[id]));
             for (const it of items) {
                 const product = it && it.product;
                 if (!product || !product.id || seen.has(product.id)) continue;
                 seen.add(product.id);
                 ids.push(product.id);
+                const koru = korunan.has(product.id);
                 if (!this.countingData[product.id]) this.addProductToCounting(product, { skipSave: true });
-                else this._resetCountingEntryStockFields(this.countingData[product.id]);
+                else if (!koru) this._resetCountingEntryStockFields(this.countingData[product.id]);
                 const entry = this.countingData[product.id];
-                if (entry) delete entry.reservedStock;
-                // Getir'de stoğu 0: depo ve sistem 0 işlenir, sayılmış sayılır
-                if (entry && it.sifir === true) {
+                const sistemBos = entry && (entry.systemStock === null || entry.systemStock === undefined);
+                if (entry && !koru) delete entry.reservedStock;
+                if (koru && !sistemBos) {
+                    // Sayılmış ve sistemi girilmiş: eksik/fazla olduğu gibi kalır
+                } else if (koru && it.sifir === true) {
+                    entry.systemStock = 0;
+                    entry.systemStockAt = new Date().toISOString();
+                } else if (entry && it.sifir === true) {
+                    // Getir'de stoğu 0: depo ve sistem 0 işlenir, sayılmış sayılır
                     entry.warehouseStock = this._ekSayim(entry) || 0;
                     entry.systemStock = 0;
                 } else if (entry && it.sistem != null && !Number.isNaN(Number(it.sistem))) {
@@ -9174,13 +9184,17 @@ class CountingSystem {
                 }
             }
 
+            korunan.forEach((id) => {
+                if (!seen.has(id)) { seen.add(id); ids.push(id); }
+            });
+
             await this._purgeTableProductsNotInSet(ids);
             this._ensureActiveTable(targetTable, 'döngü temizlik sonrası');
             this.applyImportedProductOrder(ids, { replaceRest: true });
             this._verifyCountingDataTableBinding();
             this._syncProductOrderMeta();
             this.pushAuditEntry(
-                `Döngü · ${this.formatTableDisplayName(targetTable)} · ${ids.length} ürün${options.kaynak ? ' · ' + options.kaynak : ''}`,
+                `Döngü · ${this.formatTableDisplayName(targetTable)} · ${ids.length} ürün${korunan.size ? ` · ${korunan.size} sayım korundu` : ''}${options.kaynak ? ' · ' + options.kaynak : ''}`,
                 { cat: 'import', tbl: targetTable }
             );
 
