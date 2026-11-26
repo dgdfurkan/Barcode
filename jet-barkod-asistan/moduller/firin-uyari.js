@@ -410,6 +410,7 @@
         if (kap) kap.remove();
         kap = null;
         kok = null;
+        kartImza = '';
     }
 
     /** Pişirme panelindeki kartın küçüğü, altında erteleme satırı */
@@ -515,6 +516,11 @@
         ciz(son);
     }
 
+    /* Çizili kartın içeriği: aynı veri gelince (kritikte 5 sn'de bir) kart hiç
+       yeniden çizilmez; değiştiyse silinmeden yerinde güncellenir, giriş
+       hareketi yalnız ilk açılışta oynar. */
+    var kartImza = '';
+
     function ciz(m) {
         son = m || { liste: [] };
         var tum = son.liste || [];
@@ -523,17 +529,11 @@
             ? tum.filter(function (u) { return !(son.simErtele && son.simErtele[u.ad]); })
             : tum.filter(function (u) { return !ertelenmisMi(u.ad, simdi); });
         var ertelenen = tum.length - liste.length;
-        kaldir();
         // Çarpıyla gizliyken çizilmez; veri `son`da bekler, süre dolunca çizilir
-        if (!son.sim && simdi < gizliBitis) return;
+        if (!son.sim && simdi < gizliBitis) { kaldir(); return; }
         // Simülasyonda her şey ertelendiyse simülasyon biter, bekleyen gerçek veri gelir
-        if (son.sim && !liste.length) { simBitir(); return; }
-        if (!etkin || !PANO_YOLU.test(location.pathname) || !liste.length) return;
-
-        kap = document.createElement('div');
-        kap.id = 'jba-firin-uyari';
-        kok = kap.attachShadow({ mode: 'closed' });
-        document.documentElement.appendChild(kap);
+        if (son.sim && !liste.length) { kaldir(); simBitir(); return; }
+        if (!etkin || !PANO_YOLU.test(location.pathname) || !liste.length) { kaldir(); return; }
 
         var dilimler = Array.isArray(son.dilimler) ? son.dilimler : DILIM_AD;
         var simdiki = typeof son.simdiki === 'number' ? son.simdiki : -1;
@@ -546,8 +546,7 @@
         if (sure && !son.simBitis) son.simBitis = simdi + sure;
         var kalan = sure ? Math.max(0, son.simBitis - simdi) : 0;
 
-        kok.innerHTML = '<style>' + STIL + '</style>' +
-            '<div class="pano" role="alert" aria-live="polite">' +
+        var icerik =
                 '<div class="ust">' +
                     '<span class="ikon"><svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 0 1 16 0v6H4z"/><path d="M8 18v-3M12 18v-4M16 18v-3"/></svg><i></i></span>' +
                     '<div class="metin"><p class="baslik">' + (cikarKipi ? 'Fırın Ürünlerini Çıkar' : 'Pişirme Zamanı') + (son.sim ? '<span class="sim">Simülasyon</span>' : '') + '</p>' +
@@ -558,8 +557,24 @@
                 (liste.length > goster.length ? '<p class="daha">+' + (liste.length - goster.length) + ' ürün daha</p>' : '') +
                 (ertelenen ? '<p class="ertelenen"><span>' + ertelenen + ' ürün ertelendi</span><button type="button" class="geri-al">Geri Al</button></p>' : '') +
                 '<button type="button" class="git"><span>Fırın Sayfasını Aç</span><svg viewBox="0 0 20 20"><path d="M8 5h7v7M15 5l-9 9"/></svg></button>' +
-                (sure ? '<span class="sure" style="animation-duration:' + sure + 'ms;animation-delay:-' + (sure - kalan) + 'ms"></span>' : '') +
-            '</div>';
+                (sure ? '<span class="sure" style="animation-duration:' + sure + 'ms;animation-delay:-' + (sure - kalan) + 'ms"></span>' : '');
+
+        var imza = (son.sim ? 's|' : 'g|') + icerik;
+        var cizili = kap && kok && kap.isConnected && kok.querySelector('.pano');
+        if (cizili && !son.sim && kartImza.charAt(0) === 'g') {
+            if (kartImza === imza) return;
+            cizili.innerHTML = icerik;
+            kartImza = imza;
+            altKenariYaz();
+            return;
+        }
+        kaldir();
+        kap = document.createElement('div');
+        kap.id = 'jba-firin-uyari';
+        kok = kap.attachShadow({ mode: 'closed' });
+        document.documentElement.appendChild(kap);
+        kok.innerHTML = '<style>' + STIL + '</style><div class="pano" role="alert" aria-live="polite">' + icerik + '</div>';
+        kartImza = imza;
 
         kok.querySelector('.pano').addEventListener('click', tiklama);
         kok.querySelector('.pano').addEventListener('keydown', function (e) {

@@ -19,9 +19,9 @@
  * eklenince bildirimden çıkar ve alarm o ürün için biter. Bildirim kartından
  * ertelenen ya da Asistan penceresinden susturulan ürün de çalmaz. "En çok"
  * süresi seçildiyse o kadar sonra durur. Fırın bildirimi açık olmalı: karar
- * onun kontrolünden gelir. Alarm sürerken fırın 5 sn'de bir kontrol edilir ve
- * ses yalnız kontrolün hemen ardından, ürün hâlâ bildirimdeyse çalar; ürün
- * eklenip bildirimden çıkınca çalan ses de kesilir.
+ * onun kontrolünden gelir. Alarm sürerken fırın 5 sn'de bir SESSİZ kontrol
+ * edilir; ses yalnız seçilen tekrar süresi (30 sn, 1 dk...) dolunca ve ürün
+ * hâlâ bildirimdeyse çalar. Ürün eklenip bildirimden çıkınca çalan ses kesilir.
  *
  * GÜN SONU
  * 23:30'da "fırın ürünlerini çıkar" sesi: seçilen ses, uzunluk (3/5/10 sn) ve
@@ -299,7 +299,10 @@ globalThis.jbaFirinKontrolSonucu = function (cevap, mod) {
     }
     if (aktif.size !== once || once) durumYaz();
     if (!calacakVar()) kritikSesiKes();
-    if (aktif.size > once) sonAlarm = 0; // yeni ürün: aralığı beklemeden çal
+    // Alarm yeni başladıysa hemen çalar. Sürerken başka ürün de kritiğe düşerse
+    // sayaç sıfırlanmaz: ses yine seçilen tekrar süresiyle çalar, 5 sn'lik
+    // kontroller sessizdir.
+    if (once === 0 && aktif.size > 0) sonAlarm = 0;
     globalThis.jbaFirinSesNabiz();
 };
 
