@@ -124,17 +124,34 @@ async function ftTedarik(sekmeId, zorla) {
     try { return await ftTedarikSuruyor; } finally { ftTedarikSuruyor = null; }
 }
 
-/** Franchise Mevcut stok: ürün kimliği → raf (available). Okunamazsa {} */
+/* Depo: açık depo paneli sekmesinin adresinden. Franchise oturum kaydındaki
+   depo kimliği başka bir depoya ait olabiliyor (birden çok depo), ona güvenilmez. */
+async function ftDepo(bilgi) {
+    try {
+        for (const t of await chrome.tabs.query({ url: FT_PANEL })) {
+            const m = /\/r\/([0-9a-f]{24})\//.exec(t.url || '');
+            if (m) return m[1];
+        }
+    } catch (e) { /* sekme yok */ }
+    try { const v = (await chrome.storage.local.get('jbaSonDepo')).jbaSonDepo; if (FT_KIMLIK.test(String(v || ''))) return v; } catch (e) { /* yok */ }
+    return bilgi && FT_KIMLIK.test(String(bilgi.warehouseId || '')) ? bilgi.warehouseId : null;
+}
+
+/**
+ * Franchise Mevcut stok: ürün kimliği → { raf, aktif }. Aynı adla iki ürün
+ * olabiliyor (biri inaktif, status 0); karar kimlikle verilir.
+ * @returns {Promise<{ok:boolean, degerler:Object}>}
+ */
 async function ftRafStoklari(idler) {
     const temiz = [...new Set(idler.filter((x) => FT_KIMLIK.test(x)))].slice(0, 40);
-    if (!temiz.length) return {};
+    if (!temiz.length) return { ok: true, degerler: {} };
     const anahtar = temiz.slice().sort().join(',');
-    if (ftStok.anahtar === anahtar && Date.now() - ftStok.zaman < FT_STOK_MS) return ftStok.degerler;
+    if (ftStok.anahtar === anahtar && Date.now() - ftStok.zaman < FT_STOK_MS) return { ok: true, degerler: ftStok.degerler };
     let bilgi = null;
     try { bilgi = (await chrome.storage.local.get('getir_api_info')).getir_api_info; } catch (e) { bilgi = null; }
     const jeton = bilgi && typeof bilgi.token === 'string' ? bilgi.token : '';
-    const depo = bilgi && FT_KIMLIK.test(String(bilgi.warehouseId || '')) ? bilgi.warehouseId : null;
-    if (!jeton || !depo) return {};
+    const depo = await ftDepo(bilgi);
+    if (!jeton || !depo) return { ok: false, degerler: {} };
     const degerler = {};
     try {
         const r = await fetch(FT_GETIR + '/stocks?offset=0&limit=' + temiz.length, {
@@ -142,17 +159,20 @@ async function ftRafStoklari(idler) {
             headers: { 'Content-Type': 'application/json', Accept: 'application/json', Authorization: /^Bearer /.test(jeton) ? jeton : 'Bearer ' + jeton },
             body: JSON.stringify({ productIds: temiz, warehouseIds: [depo] }),
         });
-        if (!r.ok) return {};
+        if (!r.ok) return { ok: false, degerler: {} };
         const j = await r.json();
         ((j && j.data) || []).forEach((x) => {
             const id = String(x.product || x.id || x._id || '');
-            if (typeof x.available === 'number') degerler[id] = Math.max(0, x.available);
+            degerler[id] = {
+                raf: typeof x.available === 'number' ? Math.max(0, x.available) : null,
+                aktif: x.status === undefined ? true : Number(x.status) === 1,
+            };
         });
     } catch (e) {
-        return {};
+        return { ok: false, degerler: {} };
     }
     ftStok = { zaman: Date.now(), anahtar, degerler };
-    return degerler;
+    return { ok: true, degerler };
 }
 
 function ftDilim(saat) {
@@ -185,19 +205,29 @@ async function ftListeDisi(mevcut, sekmeId, bekle) {
     }
     if (!t || !Array.isArray(t.teslimatlar)) return [];
     const simdi = Date.now();
-    // Ürün başına en son kabul edilen teslimat
-    const gelen = {};
+    // Mal kabulle gelmiş, öneri listesinde olmayan La Lorraine kalemleri (kimlik bazında)
+    const kalemler = [];
     t.teslimatlar.forEach((x) => {
         if (!x || !x.kabul || !/^(COMPLETED|CLOSED)$/.test(x.durum || '')) return;
         (x.urunler || []).forEach((u) => {
-            if (!ftLaLorraine(u.ad) || !(u.alinan > 0)) return;
-            const k = ftSade(u.ad);
-            if (!gelen[k] || gelen[k].kabul < x.kabul) gelen[k] = { ad: u.ad, id: u.id, gorsel: u.gorsel, alinan: u.alinan, kabul: x.kabul };
+            if (!ftLaLorraine(u.ad) || !(u.alinan > 0) || !FT_KIMLIK.test(u.id || '')) return;
+            if (varOlan.has(ftSade(u.ad))) return;
+            kalemler.push({ ad: u.ad, id: u.id, gorsel: u.gorsel, alinan: u.alinan, kabul: x.kabul });
         });
+    });
+    if (!kalemler.length) return [];
+    // Aynı adlı inaktif ürün (status 0) karışmasın: stok kaydı kimlikle okunur, inaktif ve
+    // bu depoda olmayan kimlik elenir. Stok okunamadıysa eleme yapılamaz, hepsi kalır.
+    const stok = await ftRafStoklari(kalemler.map((g) => g.id));
+    const gelen = {};
+    kalemler.forEach((g) => {
+        const s = stok.degerler[g.id];
+        if (stok.ok && (!s || !s.aktif)) return;
+        const k = ftSade(g.ad);
+        if (!gelen[k] || gelen[k].kabul < g.kabul) gelen[k] = g;
     });
     const adaylar = [];
     Object.keys(gelen).forEach((k) => {
-        if (varOlan.has(k)) return;
         const g = gelen[k];
         const bil = b[k];
         if (bil && !(g.kabul > bil.son)) return; // geldikten sonra listede görüldü, donuğu bitti
@@ -205,13 +235,13 @@ async function ftListeDisi(mevcut, sekmeId, bekle) {
         adaylar.push({ k, g, bil });
     });
     if (!adaylar.length) return [];
-    const raf = await ftRafStoklari(adaylar.map((a) => a.g.id));
     const suan = ftDilim(new Date().getHours());
     const satirlar = [];
     adaylar.forEach(({ g, bil }) => {
         const oneriler = bil && Array.isArray(bil.oneriler) ? bil.oneriler : [0, 0, 0, 0];
         const hedef = oneriler[suan] || Math.max(0, ...oneriler) || 2;
-        const r = Object.prototype.hasOwnProperty.call(raf, g.id) ? raf[g.id] : null;
+        const s = stok.degerler[g.id];
+        const r = s && typeof s.raf === 'number' ? s.raf : null;
         if (r !== null && r >= hedef) return;
         const pisir = Math.max(1, Math.min(g.alinan, hedef - (r || 0)));
         satirlar.push({
@@ -271,11 +301,12 @@ function ftPlan(t) {
     return t.teslimatlar
         .filter((x) => x && (bitti(x) ? x.kabul >= yakin : (x.beklenen && x.beklenen >= bugun.getTime() && x.beklenen < son)))
         .map((x) => ({
+            id: x.id,
             durum: bitti(x) ? 'geldi' : 'planli',
             beklenen: x.beklenen,
             kabul: bitti(x) ? x.kabul : null,
             urunler: (x.urunler || []).filter((u) => ftLaLorraine(u.ad))
-                .map((u) => ({ ad: u.ad, siparis: u.siparis, alinan: bitti(x) ? u.alinan : null })),
+                .map((u) => ({ ad: u.ad, gorsel: u.gorsel || '', siparis: u.siparis, alinan: bitti(x) ? u.alinan : null })),
         }))
         .filter((x) => x.urunler.length)
         .sort((a, b) => (a.kabul || a.beklenen || 0) - (b.kabul || b.beklenen || 0));

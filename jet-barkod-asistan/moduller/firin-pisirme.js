@@ -39,7 +39,45 @@
         '  font-family: inherit; -webkit-appearance: none; appearance: none; }',
         '#jba-firin-dugme:hover { background: #1e40af; }',
         '#jba-firin-dugme::before { content: ""; width: 6px; height: 6px;',
-        '  border-radius: 50%; background: #fbbf24; }'
+        '  border-radius: 50%; background: #fbbf24; }',
+        /* La Lorraine Takibi: teslimat kartları, simgeler, tıklayınca açılan ürün listesi */
+        '.jba-ll { padding: 16px; border: 1px solid #e4e7ec; border-radius: 12px; background: #fff; font-family: inherit; }',
+        '.jba-ll__bas { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }',
+        '.jba-ll__bas h3 { margin: 0; font-size: 15px; font-weight: 700; line-height: 20px; color: #111827; }',
+        '.jba-ll__bas span { flex: none; font-size: 11px; line-height: 16px; color: #667085; font-variant-numeric: tabular-nums; }',
+        '.jba-ll__not, .jba-ll__bos { margin: 4px 0 0; font-size: 12px; line-height: 16px; color: #667085; }',
+        '.jba-ll__liste { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }',
+        '.jba-ll-tes { border: 1px solid #eaecf0; border-radius: 12px; background: #fff; overflow: hidden; }',
+        '.jba-ll-tes__ac { width: 100%; min-height: 56px; display: flex; align-items: center; gap: 12px; padding: 8px 12px;',
+        '  border: 0; background: transparent; font: inherit; color: inherit; text-align: left; cursor: pointer;',
+        '  transition: background-color 140ms cubic-bezier(.22,1,.36,1); }',
+        '.jba-ll-tes__ac:hover { background: #f9fafb; }',
+        '.jba-ll-tes__ac:focus-visible { outline: 2px solid #2563eb; outline-offset: -2px; }',
+        '.jba-ll-hap { flex: none; padding: 2px 8px; border-radius: 999px; font-size: 10px; font-weight: 700; line-height: 16px; letter-spacing: .02em; }',
+        '.jba-ll-hap--geldi { background: #e7f6ef; color: #047857; }',
+        '.jba-ll-hap--planli { background: #fef4e6; color: #b54708; }',
+        '.jba-ll-tes__metin { flex: 1; min-width: 0; display: flex; flex-direction: column; }',
+        '.jba-ll-tes__metin b { font-size: 13px; font-weight: 600; line-height: 18px; color: #111827; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }',
+        '.jba-ll-tes__metin small { font-size: 11px; line-height: 16px; color: #667085; }',
+        '.jba-ll-yigin { flex: none; display: flex; align-items: center; padding-left: 8px; }',
+        '.jba-ll-yigin__oge { width: 32px; height: 32px; margin-left: -8px; border: 2px solid #fff; border-radius: 999px; background: #f4f6f9;',
+        '  object-fit: cover; box-sizing: border-box; display: grid; place-items: center; font-size: 10px; font-weight: 700; color: #344054; }',
+        '.jba-ll-yigin__oge.is-gelmedi { opacity: .35; filter: grayscale(1); }',
+        '.jba-ll-ok { flex: none; width: 16px; height: 16px; fill: none; stroke: #98a2b3; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;',
+        '  transition: transform 160ms cubic-bezier(.22,1,.36,1); }',
+        '.jba-ll-tes__ac[aria-expanded="true"] .jba-ll-ok { transform: rotate(180deg); }',
+        '.jba-ll-tes__ic { list-style: none; margin: 0; padding: 4px 12px 8px; border-top: 1px solid #f2f4f7; animation: jba-ll-gel 160ms cubic-bezier(.22,1,.36,1); }',
+        '.jba-ll-tes__ic[hidden] { display: none; }',
+        '@keyframes jba-ll-gel { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }',
+        '.jba-ll-urun { display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 4px 0; }',
+        '.jba-ll-urun__gorsel { width: 40px; height: 40px; border-radius: 9px; background: #f4f6f9; object-fit: cover; display: grid; place-items: center;',
+        '  font-size: 12px; font-weight: 700; color: #344054; }',
+        '.jba-ll-urun > span:not(.jba-ll-urun__gorsel) { min-width: 0; font-size: 12px; line-height: 16px; color: #344054; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }',
+        '.jba-ll-urun > b { font-size: 12px; font-weight: 700; line-height: 16px; color: #344054; font-variant-numeric: tabular-nums; white-space: nowrap; }',
+        '.jba-ll-urun > b.is-tam { color: #047857; }',
+        '.jba-ll-urun > b.is-eksik { color: #b54708; }',
+        '.jba-ll-urun > b.is-gelmedi { color: #b42318; }',
+        '@media (prefers-reduced-motion: reduce) { .jba-ll-tes__ic, .jba-ll-ok, .jba-ll-tes__ac { animation: none; transition: none; } }'
     ].join('\n');
 
     function stilKur() {
@@ -1144,6 +1182,8 @@
              60 sn saklanır; görünüm her yenilendiğinde yeniden istenmez. */
           let llSon = null;
           let llZaman = 0;
+          // Açılan teslimat kartları görünüm yenilenince kapanmasın
+          const llAcik = new Set();
           let llSuruyor = false;
           function llIste(sonra) {
             if (llSon && Date.now() - llZaman < 60000) { sonra(llSon); return; }
@@ -1214,34 +1254,78 @@
                 kart.appendChild(sag);
                 blok.appendChild(kart);
               });
-              const plan = el('div', 'padding:12px;border:1px solid #e5e7eb;border-radius:12px;background:#fff;');
-              plan.appendChild(el('p', 'margin:0;font-size:13px;font-weight:700;line-height:18px;color:#111827;', 'La Lorraine Takibi'));
-              plan.appendChild(el('p', 'margin:2px 0 0;font-size:11px;line-height:16px;color:#667085;',
-                'Planlılarda sipariş adedi, gelenlerde mal kabulde alınan adet.' + (c.zaman ? ' Son kontrol ' + new Date(c.zaman).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }) + '.' : '')));
-              if (!c.ok) {
-                plan.appendChild(el('p', 'margin:4px 0 0;font-size:12px;line-height:16px;color:#667085;', 'Tedarik listesi okunamadı. Kontrol paneli açıkken yeniden dene.'));
-              } else if (!(c.plan || []).length) {
-                plan.appendChild(el('p', 'margin:4px 0 0;font-size:12px;line-height:16px;color:#667085;', 'Önümüzdeki 7 günde planlı La Lorraine teslimatı yok.'));
+              const plan = el('section', null);
+              plan.className = 'jba-ll';
+              const bas = el('div', null); bas.className = 'jba-ll__bas';
+              bas.appendChild(el('h3', null, 'La Lorraine Takibi'));
+              if (c.zaman) bas.appendChild(el('span', null, 'Son kontrol ' + new Date(c.zaman).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })));
+              plan.appendChild(bas);
+              const not = el('p', null, 'Planlılarda sipariş adedi, gelenlerde mal kabulde alınan adet.'); not.className = 'jba-ll__not';
+              plan.appendChild(not);
+              if (!c.ok || !(c.plan || []).length) {
+                const bos = el('p', null, !c.ok ? 'Tedarik listesi okunamadı. Kontrol paneli açıkken yeniden dene.' : 'Önümüzdeki 7 günde planlı La Lorraine teslimatı yok.');
+                bos.className = 'jba-ll__bos';
+                plan.appendChild(bos);
               } else {
-                c.plan.forEach((t) => {
+                const liste = el('div', null); liste.className = 'jba-ll__liste';
+                const kisa = (ad) => String(ad || '').replace(/^\s*la\s+lorraine\s+/i, '');
+                const gorselYap = (u, sinif) => {
+                  if (/^https:\/\//.test(u.gorsel || '')) {
+                    const img = el('img', null); img.className = sinif; img.src = u.gorsel; img.alt = ''; img.loading = 'lazy';
+                    return img;
+                  }
+                  const yer = el('span', null, kisa(u.ad).slice(0, 1)); yer.className = sinif + ' jba-ll-yok';
+                  return yer;
+                };
+                c.plan.forEach((t, i) => {
                   const geldi = t.durum === 'geldi';
-                  const g = el('div', 'margin-top:8px;padding-top:8px;border-top:1px solid #f2f4f7;');
-                  g.appendChild(el('p', 'margin:0;font-size:12px;font-weight:700;line-height:16px;color:' + (geldi ? '#047857' : '#b45309') + ';',
-                    geldi ? 'Geldi · ' + llGun(t.kabul) + ' ' + new Date(t.kabul).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })
-                          : 'Planlı · ' + llGun(t.beklenen)));
-                  const ul = el('ul', 'list-style:none;margin:4px 0 0;padding:0;display:flex;flex-direction:column;gap:2px;');
-                  t.urunler.forEach((u) => {
-                    const li = el('li', 'display:flex;justify-content:space-between;gap:12px;font-size:12px;line-height:16px;color:#374151;');
-                    li.appendChild(el('span', 'min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;', String(u.ad).replace(/^\s*la\s+lorraine\s+/i, '')));
-                    if (!geldi) li.appendChild(el('b', 'flex:none;font-variant-numeric:tabular-nums;', u.siparis + ' sipariş'));
-                    else if (!(u.alinan > 0)) li.appendChild(el('b', 'flex:none;color:#b42318;', 'Gelmedi · sipariş ' + u.siparis));
-                    else li.appendChild(el('b', 'flex:none;font-variant-numeric:tabular-nums;' + (u.alinan < u.siparis ? 'color:#b45309;' : ''),
-                      u.alinan + ' / ' + u.siparis + ' geldi'));
-                    ul.appendChild(li);
+                  const anahtar = t.id || (String(t.kabul || t.beklenen) + i);
+                  const tes = el('div', null); tes.className = 'jba-ll-tes';
+                  const ac = el('button', null); ac.type = 'button'; ac.className = 'jba-ll-tes__ac';
+                  ac.setAttribute('aria-expanded', llAcik.has(anahtar) ? 'true' : 'false');
+                  const hap = el('span', null, geldi ? 'Geldi' : 'Planlı'); hap.className = 'jba-ll-hap ' + (geldi ? 'jba-ll-hap--geldi' : 'jba-ll-hap--planli');
+                  ac.appendChild(hap);
+                  const metin = el('span', null); metin.className = 'jba-ll-tes__metin';
+                  metin.appendChild(el('b', null, geldi
+                    ? llGun(t.kabul) + ' · ' + new Date(t.kabul).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })
+                    : llGun(t.beklenen)));
+                  const gelmeyen = geldi ? t.urunler.filter((u) => !(u.alinan > 0)).length : 0;
+                  metin.appendChild(el('small', null, geldi
+                    ? (t.urunler.length - gelmeyen) + ' ürün geldi' + (gelmeyen ? ' · ' + gelmeyen + ' ürün gelmedi' : '')
+                    : t.urunler.length + ' ürün · ' + t.urunler.reduce((x, u) => x + (Number(u.siparis) || 0), 0) + ' adet sipariş'));
+                  ac.appendChild(metin);
+                  const yigin = el('span', null); yigin.className = 'jba-ll-yigin'; yigin.setAttribute('aria-hidden', 'true');
+                  t.urunler.slice(0, 4).forEach((u) => {
+                    const g = gorselYap(u, 'jba-ll-yigin__oge');
+                    if (geldi && !(u.alinan > 0)) g.classList.add('is-gelmedi');
+                    yigin.appendChild(g);
                   });
-                  g.appendChild(ul);
-                  plan.appendChild(g);
+                  if (t.urunler.length > 4) { const d = el('span', null, '+' + (t.urunler.length - 4)); d.className = 'jba-ll-yigin__oge jba-ll-yigin__daha'; yigin.appendChild(d); }
+                  ac.appendChild(yigin);
+                  ac.insertAdjacentHTML('beforeend', '<svg class="jba-ll-ok" viewBox="0 0 20 20" aria-hidden="true"><path d="m6 8 4 4 4-4"/></svg>');
+                  const ic = el('ul', null); ic.className = 'jba-ll-tes__ic'; ic.hidden = !llAcik.has(anahtar);
+                  t.urunler.forEach((u) => {
+                    const li = el('li', null); li.className = 'jba-ll-urun';
+                    li.appendChild(gorselYap(u, 'jba-ll-urun__gorsel'));
+                    li.appendChild(el('span', null, kisa(u.ad)));
+                    let sag;
+                    if (!geldi) { sag = el('b', null, u.siparis + ' sipariş'); }
+                    else if (!(u.alinan > 0)) { sag = el('b', null, 'Gelmedi · ' + u.siparis + ' sipariş'); sag.className = 'is-gelmedi'; }
+                    else { sag = el('b', null, u.alinan + ' / ' + u.siparis); sag.className = u.alinan < u.siparis ? 'is-eksik' : 'is-tam'; }
+                    li.appendChild(sag);
+                    ic.appendChild(li);
+                  });
+                  ac.addEventListener('click', () => {
+                    const acik = ac.getAttribute('aria-expanded') !== 'true';
+                    ac.setAttribute('aria-expanded', acik ? 'true' : 'false');
+                    ic.hidden = !acik;
+                    if (acik) llAcik.add(anahtar); else llAcik.delete(anahtar);
+                  });
+                  tes.appendChild(ac);
+                  tes.appendChild(ic);
+                  liste.appendChild(tes);
                 });
+                plan.appendChild(liste);
               }
               blok.appendChild(plan);
               // Hazırlık afişi varsa onun altına, yoksa en üste
