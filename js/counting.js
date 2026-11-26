@@ -425,6 +425,11 @@ class CountingSystem {
             // Sayfa görünür olunca aktif tabloyu hafif catch-up (realtime kaçırılan güncellemeler için)
             this._setupVisibilityRefresh();
 
+            // Sunucuya yazılamamış sayımlar: önce bu cihazdaki hâli geri gelsin, sonra gönderilsin
+            this._kuyruguYereleUygula();
+            this._kuyrukZamanla(3000);
+            window.addEventListener('online', () => this._kuyrukZamanla(500));
+
             // İlk açılışta tekrar tam DB çekme yok — loadCountingData + realtime yeterli
 
             // beforeunload: pending save'leri flush et (localStorage'a en azından yaz)
@@ -2151,9 +2156,13 @@ class CountingSystem {
         const veri = kaynak || this.countingData;
 
         const rows = [];
+        const anlik = [];
         for (const pid of productIds) {
             const snapshot = this._snapshotProductEntry(veri[pid]);
-            if (snapshot) rows.push(this._buildCountingItemUpsertRow(tName, pid, snapshot));
+            if (snapshot) {
+                rows.push(this._buildCountingItemUpsertRow(tName, pid, snapshot));
+                anlik.push([pid, snapshot]);
+            }
         }
         if (rows.length === 0) return;
 
@@ -2172,7 +2181,10 @@ class CountingSystem {
             } else if (!error) {
                 this._countingItemsPriceExtension = true;
             }
-            if (error) console.warn('_bulkSaveProductEntries chunk hatası:', error.message);
+            if (error) {
+                console.warn('_bulkSaveProductEntries chunk hatası:', error.message);
+                anlik.slice(i, i + CHUNK).forEach(([pid, snap]) => this._kuyrugaEkle(tName, pid, snap));
+            }
         }
         this._saveFullBlobToLocalStorage();
         this._scheduleFullBackup();
@@ -2512,6 +2524,12 @@ class CountingSystem {
      * bütün tablolar tek sorguda (1000'erli sayfa) geliyor, çipler bir kerede
      * boyanıyor. Taşınan veri aynı, yalnız istek sayısı düştü.
      */
+    /** Bütün tabloların ürünleri indi: Döngü durumları artık doğru hesaplanır */
+    _isinmaBitti() {
+        this._isindi = true;
+        try { window.dispatchEvent(new CustomEvent('jb:sayim-isindi')); } catch (e) { /* eski tarayıcı */ }
+    }
+
     async _warmCountingTablesInBackground() {
         if (this._countingItemsTableReady !== true || !this.cachedFullData || this._isitmaSuruyor) return;
         const bekleyen = () => {
@@ -2526,7 +2544,7 @@ class CountingSystem {
                 return !(slot && this._countTableProductKeys(slot) > 0);
             });
         };
-        if (bekleyen().length === 0) return;
+        if (bekleyen().length === 0) { this._isinmaBitti(); return; }
         this._isitmaSuruyor = true;
         try {
             const SAYFA = 1000;
@@ -2568,6 +2586,7 @@ class CountingSystem {
         }
         this._invalidateFinanceCache();
         this._scheduleTableSelectorUpdate(0);
+        this._isinmaBitti();
     }
 
     _isSheetStockFetchLocked() {
@@ -4848,6 +4867,8 @@ class CountingSystem {
             return;
         }
 
+        // İstek sürerken sayfa kapanırsa (telefon arka plana atınca) sayım kaybolmasın
+        this._kuyrugaEkle(tableName, productId, snapshot, true);
         try {
             const row = this._buildCountingItemUpsertRow(tableName, productId, snapshot);
             let { error } = await window.jbDb.from('counting_items').upsert(row, {
@@ -4863,15 +4884,146 @@ class CountingSystem {
                 this._countingItemsPriceExtension = true;
             }
             if (error) throw error;
+            this._kuyruktanCikar(tableName, productId, snapshot.lastUpdated);
             // Başarılı: localStorage'ı tam blob ile güncelle + gecikmeli Supabase tam yedek
             this._saveFullBlobToLocalStorage();
             this._scheduleFullBackup();
         } catch (e) {
             console.error('saveProductEntry hatası:', e);
+            // Yedek blob yalnız tablo listesini taşıyor: sayım kuyrukta, gidene kadar denenir
+            this._kuyrugaEkle(tableName, productId, snapshot);
             // Başarısız: localStorage + Supabase tam blob yaz (çift güvenlik)
             this._saveFullBlobToLocalStorage();
             this._scheduleFullBackup(); // 3s içinde Supabase'e tam blob yaz
             this.scheduleSave(400);     // 400ms sonra saveFullCountingData → tam blob
+        }
+    }
+
+    /*
+     * KAYIT KUYRUĞU
+     * Bir ürünün sunucuya yazılması düşerse (bağlantı kopması, oturum
+     * yenilenmesi) sayım yalnız o cihazda kalıyordu: yedek yazma tablo
+     * listesini taşıyor, sayımı değil. Telefonda sayılanlar bilgisayara hiç
+     * gitmiyor, sonra kayboluyordu. Düşen kayıt anlık hâliyle yerel depoya
+     * yazılır ve gidene kadar yeniden denenir. Sunucudaki satır daha yeniyse
+     * (başka cihaz sonra saydı) ezilmez.
+     */
+    _kuyrukAnahtari() { return 'jb_sayim_bekleyen_' + (this.currentUser?.username || 'x'); }
+
+    _kuyrukOku() {
+        try {
+            const v = JSON.parse(localStorage.getItem(this._kuyrukAnahtari()) || '[]');
+            return Array.isArray(v) ? v.filter((x) => x && x.t && x.p && x.e) : [];
+        } catch (e) { return []; }
+    }
+
+    _kuyrukYaz(liste) {
+        try {
+            if (liste.length) localStorage.setItem(this._kuyrukAnahtari(), JSON.stringify(liste.slice(-500)));
+            else localStorage.removeItem(this._kuyrukAnahtari());
+        } catch (e) { /* kota dolu */ }
+    }
+
+    _kuyrugaEkle(tableName, productId, snapshot, sessiz) {
+        if (!tableName || !productId || !snapshot || !this.currentUser) return;
+        const liste = this._kuyrukOku().filter((x) => !(x.t === tableName && x.p === productId));
+        liste.push({ t: tableName, p: productId, e: snapshot });
+        this._kuyrukYaz(liste);
+        if (sessiz) return;
+        if (!this._kuyrukUyarildi) {
+            this._kuyrukUyarildi = true;
+            this.showToast('Sayım sunucuya yazılamadı. Bu cihazda saklandı, bağlantı gelince gönderilecek.', 'warning', 5000);
+        }
+        this._kuyrukZamanla(5000);
+    }
+
+    /** Gönderilen anlık hâlden yeni bir kayıt beklemiyorsa kuyruktan düşer */
+    _kuyruktanCikar(tableName, productId, lastUpdated) {
+        const liste = this._kuyrukOku();
+        if (!liste.length) return;
+        const kalan = liste.filter((x) => !(x.t === tableName && x.p === productId &&
+            (!lastUpdated || (Date.parse(x.e.lastUpdated || '') || 0) <= (Date.parse(lastUpdated) || 0))));
+        if (kalan.length !== liste.length) this._kuyrukYaz(kalan);
+    }
+
+    _kuyrukZamanla(ms) {
+        if (this._kuyrukZamanlayici) return;
+        this._kuyrukZamanlayici = setTimeout(() => {
+            this._kuyrukZamanlayici = null;
+            this._kuyruguGonder().catch(() => {});
+        }, ms);
+    }
+
+    /** Kuyruktaki anlık hâl yereldekinden yeniyse yerele geri yazılır (sayfa yeniden açıldı) */
+    _kuyruguYereleUygula() {
+        const liste = this._kuyrukOku();
+        if (!liste.length || !this.cachedFullData?._tables) return;
+        let degisti = false;
+        for (const x of liste) {
+            const slot = this.cachedFullData._tables[x.t];
+            if (!slot) continue;
+            const yerel = slot[x.p];
+            if (yerel && (Date.parse(yerel.lastUpdated || '') || 0) >= (Date.parse(x.e.lastUpdated || '') || 0)) continue;
+            const entry = this._mapCountingItemRowToEntry(this._buildCountingItemUpsertRow(x.t, x.p, x.e));
+            slot[x.p] = entry;
+            if (x.t === this.currentTableName && this.countingData) this.countingData[x.p] = entry;
+            degisti = true;
+        }
+        if (degisti) {
+            this.scheduleRenderTable();
+            this.updateStatistics();
+            this.updateCountingProgress();
+            this._saveFullBlobToLocalStorage();
+        }
+    }
+
+    async _kuyruguGonder() {
+        if (this._kuyrukGonderiliyor || !window.jbDb || !this.currentUser || this._countingItemsTableReady !== true) {
+            if (this._kuyrukOku().length) this._kuyrukZamanla(15000);
+            return;
+        }
+        const liste = this._kuyrukOku();
+        if (!liste.length) return;
+        if (navigator.onLine === false) { this._kuyrukZamanla(15000); return; }
+        this._kuyrukGonderiliyor = true;
+        let kalan = 0;
+        try {
+            const tablolar = new Map();
+            for (const x of liste) {
+                if (!tablolar.has(x.t)) tablolar.set(x.t, []);
+                tablolar.get(x.t).push(x);
+            }
+            for (const [t, ogeler] of tablolar) {
+                if (this._isTableTombstoned(t)) { ogeler.forEach((o) => this._kuyruktanCikar(t, o.p)); continue; }
+                const { data, error } = await window.jbDb.from('counting_items')
+                    .select('product_id,last_updated')
+                    .eq('username', this.currentUser.username).eq('table_name', t)
+                    .in('product_id', ogeler.map((o) => o.p));
+                if (error) { kalan += ogeler.length; continue; }
+                const sunucu = new Map((data || []).map((r) => [String(r.product_id), Date.parse(r.last_updated || '') || 0]));
+                const gidecek = [];
+                for (const o of ogeler) {
+                    if ((sunucu.get(String(o.p)) || 0) >= (Date.parse(o.e.lastUpdated || '') || 0)) {
+                        this._kuyruktanCikar(t, o.p);
+                        continue;
+                    }
+                    gidecek.push(o);
+                }
+                if (!gidecek.length) continue;
+                const { error: e2 } = await window.jbDb.from('counting_items').upsert(
+                    gidecek.map((o) => this._buildCountingItemUpsertRow(t, o.p, o.e)),
+                    { onConflict: 'username,table_name,product_id' }
+                );
+                if (e2) { kalan += gidecek.length; continue; }
+                gidecek.forEach((o) => this._kuyruktanCikar(t, o.p, o.e.lastUpdated));
+            }
+        } finally {
+            this._kuyrukGonderiliyor = false;
+        }
+        if (kalan || this._kuyrukOku().length) this._kuyrukZamanla(30000);
+        else if (this._kuyrukUyarildi) {
+            this._kuyrukUyarildi = false;
+            this.showToast('Bekleyen sayımlar sunucuya gönderildi.', 'success', 3000);
         }
     }
 
@@ -5061,6 +5213,7 @@ class CountingSystem {
                 }
                 return;
             }
+            this._kuyrukZamanla(500);
             tryActiveCatchUp();
             tryMetaRefresh({ forceMeta: true });
         });
@@ -5305,6 +5458,7 @@ class CountingSystem {
             }
 
             let changed = false;
+            const gonderilecek = [];
             const localTable = this.cachedFullData?._tables?.[hedefTablo];
             if (!localTable) return;
 
@@ -5334,8 +5488,41 @@ class CountingSystem {
                         localTable[pId] = merged;
                         if (canli) canli[pId] = merged;
                         changed = true;
+                    } else if (localTs > incomingTs) {
+                        // Bu cihazdaki sayım sunucuya hiç ulaşmamış: gönderilsin
+                        gonderilecek.push(pId);
                     }
                 }
+            }
+
+            /* Sunucuda olmayan yerel ürünler. Sayılmamışsa başka cihazda listeden
+               çıkarılmıştır (Döngü yeniden çekimi): burada da kalkar, yoksa iki
+               cihazın listesi ayrışıyordu. Sayılmışsa sayım silinmez, gönderilir.
+               Son 3 dakikada değişen ya da kuyrukta bekleyen ürüne dokunulmaz.
+               Cevap boşsa ya da sınıra yakınsa (eksik gelmiş olabilir) silme yok. */
+            const satirSayisi = (rows || []).length;
+            const bekleyen = new Set(this._kuyrukOku().filter((x) => x.t === hedefTablo).map((x) => String(x.p)));
+            const yakin = Date.now() - 3 * 60 * 1000;
+            for (const pId of Object.keys(localTable)) {
+                if (this.isReservedCountingKey(pId) || incomingMap[pId] || bekleyen.has(pId)) continue;
+                const local = localTable[pId];
+                if (!local || typeof local !== 'object') continue;
+                if ((Date.parse(local.lastUpdated || '') || 0) > yakin) continue;
+                if (local.warehouseStock !== null && local.warehouseStock !== undefined) {
+                    gonderilecek.push(pId);
+                } else if (satirSayisi > 0 && satirSayisi < 900) {
+                    delete localTable[pId];
+                    if (Array.isArray(localTable._productOrder)) localTable._productOrder = localTable._productOrder.filter((x) => x !== pId);
+                    if (canli && canli !== localTable) {
+                        delete canli[pId];
+                        if (Array.isArray(canli._productOrder)) canli._productOrder = canli._productOrder.filter((x) => x !== pId);
+                    }
+                    changed = true;
+                }
+            }
+            if (gonderilecek.length) {
+                gonderilecek.forEach((pId) => this._kuyrugaEkle(hedefTablo, pId, this._snapshotProductEntry(localTable[pId]), true));
+                this._kuyrukZamanla(1000);
             }
 
             if (changed) {
@@ -9146,6 +9333,8 @@ class CountingSystem {
             const ids = [];
             const seen = new Set();
             const korunan = new Set((options.koru || []).filter((id) => this.countingData[id]));
+            // Dokunulmayan sayım yeniden yazılmaz: başka cihazın sonraki sayımını ezmesin
+            const dokunulmayan = new Set();
             for (const it of items) {
                 const product = it && it.product;
                 if (!product || !product.id || seen.has(product.id)) continue;
@@ -9159,6 +9348,7 @@ class CountingSystem {
                 if (entry && !koru) delete entry.reservedStock;
                 if (koru && !sistemBos) {
                     // Sayılmış ve sistemi girilmiş: eksik/fazla olduğu gibi kalır
+                    dokunulmayan.add(product.id);
                 } else if (koru && it.sifir === true) {
                     entry.systemStock = 0;
                     entry.systemStockAt = new Date().toISOString();
@@ -9185,7 +9375,7 @@ class CountingSystem {
             }
 
             korunan.forEach((id) => {
-                if (!seen.has(id)) { seen.add(id); ids.push(id); }
+                if (!seen.has(id)) { seen.add(id); ids.push(id); dokunulmayan.add(id); }
             });
 
             await this._purgeTableProductsNotInSet(ids);
@@ -9210,7 +9400,7 @@ class CountingSystem {
             this._ensureActiveTable(targetTable, 'döngü kayıt öncesi');
             await this.saveCountingData();
             this._ensureActiveTable(targetTable, 'döngü kayıt sonrası');
-            await this._bulkSaveProductEntries(ids, targetTable);
+            await this._bulkSaveProductEntries(ids.filter((id) => !dokunulmayan.has(id)), targetTable);
             this._ensureActiveTable(targetTable, 'döngü ürün kayıtları sonrası');
             return { added: ids.length };
         } finally {

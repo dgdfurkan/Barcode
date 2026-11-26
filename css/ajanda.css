@@ -296,6 +296,9 @@ html.aj-acik, html.aj-acik body { overflow: hidden; }
 .aj-metin-dugme { min-height: 44px; padding: 0 8px; border: 0; background: none; font: inherit; font-size: 13px; font-weight: 700; color: var(--mavi); cursor: pointer; }
 .aj-metin-dugme[hidden] { display: none; }
 
+.aj-zaten { margin: 0; padding: 12px; border-radius: 9px; background: var(--sari-50); color: var(--yazi); font-size: 12px; line-height: 16px; }
+.aj-zaten[hidden] { display: none; }
+
 .aj-alan { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 .aj-alan[hidden] { display: none; }
 .aj-etiket { font-size: 12px; line-height: 16px; font-weight: 700; color: var(--yazi-orta); }

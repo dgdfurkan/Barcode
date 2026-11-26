@@ -1,6 +1,38 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
+    <script>
+        /* Oturum açıksa ana sayfa = /arama/. Sayfa çizilmeden, sunucuya
+           sormadan: süresi dolmuş jeton burada elenir, gerisini /arama/ doğrular.
+           Telefon uygulaması yeniden başladıysa kaldığı yere döner (oturum-yeri.js). */
+        (function () {
+            try {
+                var yol = location.pathname;
+                if (yol !== '/' && yol !== '/index.html') return;
+                var jeton = localStorage.getItem('jb_token') || '';
+                var ham = localStorage.getItem('authToken');
+                var p = jeton.split('.');
+                if (!ham || p.length !== 3) return;
+                var oturum = JSON.parse(decodeURIComponent(escape(atob(ham))));
+                if (!oturum || oturum.isGuest) return;
+                if (oturum.trialEnd && Date.now() > Date.parse(oturum.trialEnd)) return;
+                var c = JSON.parse(decodeURIComponent(atob(p[1].replace(/-/g, '+').replace(/_/g, '/')).split('').map(function (k) {
+                    return '%' + ('00' + k.charCodeAt(0).toString(16)).slice(-2);
+                }).join('')));
+                if (!c || !c.exp || Date.now() >= c.exp * 1000) return;
+                var hedef = '/arama/';
+                var pwa = (window.matchMedia && (matchMedia('(display-mode: standalone)').matches || matchMedia('(display-mode: fullscreen)').matches)) || navigator.standalone === true;
+                var icerden = false;
+                try { icerden = !!document.referrer && new URL(document.referrer).origin === location.origin; } catch (e) { /* çözülemedi */ }
+                if (pwa && !icerden && !sessionStorage.getItem('jb_yer_denendi')) {
+                    sessionStorage.setItem('jb_yer_denendi', '1');
+                    var k = JSON.parse(localStorage.getItem('jb_son_sayfa') || 'null');
+                    if (k && typeof k.yol === 'string' && /^\/[^/]/.test(k.yol) && Date.now() - k.zaman < 12 * 3600 * 1000) hedef = k.yol;
+                }
+                location.replace(hedef);
+            } catch (e) { /* bozuk kayıt: giriş sayfası açılır */ }
+        })();
+    </script>
     <script src="js/console-quiet.js?v=20260828i"></script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">

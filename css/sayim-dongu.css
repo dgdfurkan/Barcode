@@ -74,6 +74,9 @@ html.sd-modu.sd-tablosuz #countingTableContainer { display: none !important; }
 .sd-ust__metin { flex: 1; min-width: 0; }
 .sd-baslik { margin: 4px 0 0; font-size: 18px; font-weight: 700; line-height: 24px; color: var(--sd-yazi); }
 .sd-sayi { font-size: 26px; line-height: 32px; font-variant-numeric: tabular-nums; }
+.sd-yer { display: inline-block; width: 2ch; height: 0.8em; border-radius: 6px; background: var(--sd-cizgi); vertical-align: -0.05em; animation: sd-yer-nabiz 1.2s var(--motion-ease-standard, ease-in-out) infinite; }
+@keyframes sd-yer-nabiz { 50% { opacity: 0.45; } }
+@media (prefers-reduced-motion: reduce) { .sd-yer { animation: none; } }
 
 .sd-oturum { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; }
 .sd-oturum--yesil { color: var(--sd-yesil-koyu); }

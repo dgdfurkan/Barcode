@@ -1491,6 +1491,15 @@
             var hedef = tabloAdi(ad);
             if (!tabloVarMi(ad)) await s.createTable(hedef, { skipRender: true });
             else if (s.currentTableName !== hedef) await s.switchTable(hedef, { skipCatchUp: true, skipRender: true });
+            // Telefonda yeni sayılanlar bu cihaza gelmemiş olabilir: önce sunucudan tazele,
+            // yoksa korunacaklar eksik hesaplanır ve sayılmamış sanılan ürün sıfırlanır
+            if (secim.koru && s.refreshCurrentTableFromDb) {
+                d.cekim.asama = 'Son sayımlar alınıyor';
+                cekimCiz();
+                if (s._flushPendingProductSaves) await s._flushPendingProductSaves(hedef);
+                await s.refreshCurrentTableFromDb();
+                if (s._kuyruguGonder) await s._kuyruguGonder();
+            }
             var korunan = secim.koru ? sayilanlar(ad) : [];
             var yazim = await s.applyDonguProducts(items, { tablo: hedef, koru: korunan });
 
@@ -1724,8 +1733,9 @@
             var f = filtreHtml(liste);
             if (panel.__filtre !== f) { panel.querySelector('[data-sd-filtreler]').innerHTML = f; panel.__filtre = f; }
             listeCiz(liste);
-            // Paylaşılan rapor varsa özet değiştiğinde sunucudaki kopya tazelenir (gecikmeli)
-            try { if (window.JBDonguPaylasim) window.JBDonguPaylasim.degisti(); } catch (e) { /* yan iş */ }
+            // Paylaşılan rapor varsa özet değiştiğinde sunucudaki kopya tazelenir (gecikmeli).
+            // Sayımlar inmeden yazılmaz: eksik veriyle hesaplanan durum rapora gitmesin.
+            try { if (window.JBDonguPaylasim && !yukleniyorMu(liste)) window.JBDonguPaylasim.degisti(); } catch (e) { /* yan iş */ }
         }
         // Giriş hareketi: listede yalnız ilk açılışta, ayrıntıda her açılışta
         if (d.ilkCizim && !azaltilmisHareket() && (d.secili || !d.girisOynadi)) {
@@ -1749,7 +1759,19 @@
             '<div class="sd-liste" data-sd-liste role="list"></div>';
     }
 
+    /* Diğer tabloların sayımları arka planda iniyor (counting.js ısınma). O
+       bitene kadar durumlar eksik veriyle hesaplanır, sonra değişir: sayıların
+       yerinde yer tutucu durur. */
+    function yukleniyorMu(liste) {
+        var s = cs();
+        if (!d.yuklendi || !s || !s.cachedFullData) return true;
+        if (s._isindi) return false;
+        return (liste || []).some(function (x) { return x.st && x.st.yukleniyor; });
+    }
+    var YER = '<span class="sd-yer" aria-hidden="true"></span>';
+
     function basHtml(tum) {
+        var bekle = yukleniyorMu(tum);
         var liste = tum.filter(function (x) { return x.kod !== 'pasif'; });
         var say = {};
         liste.forEach(function (x) { say[x.kod] = (say[x.kod] || 0) + 1; });
@@ -1767,33 +1789,36 @@
         });
         var uOran = urunToplam ? urunSayilan / urunToplam : 0;
         var bicim = function (n) { return n.toLocaleString('tr-TR'); };
-        var ilerleme = '<div class="sd-ib">' +
-            '<div class="sd-ib__ust"><span>' + (urunToplam
+        if (bekle) { oran = 0; uOran = 0; }
+        var ilerleme = '<div class="sd-ib"' + (bekle ? ' aria-busy="true"' : '') + '>' +
+            '<div class="sd-ib__ust"><span>' + (bekle ? 'Sayımlar yükleniyor'
+                : urunToplam
                 ? '<strong>' + bicim(urunSayilan) + '</strong> / ' + bicim(urunToplam) + ' Ürün Sayıldı'
                 : 'Henüz Ürün Çekilmedi') + '</span>' +
-            '<b>%' + Math.round(uOran * 100) + '</b></div>' +
+            '<b>' + (bekle ? YER : '%' + Math.round(uOran * 100)) + '</b></div>' +
             '<div class="sd-ib__cubuk"><span style="transform:scaleX(' + uOran.toFixed(4) + ')"></span></div></div>';
         return '' +
             '<header class="sd-ust">' +
             '<div class="sd-ust__metin">' +
             '<p class="sd-etiket">Sayım Döngüsü</p>' +
-            '<h2 class="sd-baslik"><span class="sd-sayi">' + guncel + '</span> / ' + toplam + ' Alt Kategori Güncel</h2>' +
+            '<h2 class="sd-baslik"><span class="sd-sayi">' + (bekle ? YER : guncel) + '</span> / ' + toplam + ' Alt Kategori Güncel</h2>' +
             '<p class="sd-alt"><span class="sd-oturum sd-oturum--' + ot.renk + '"><span class="sd-nokta"></span>' + kacir(ot.metin) + '</span>' +
             '<span data-sd-kaynak>' + kaynakDugmesi() + '</span>' + paylasDugmesi() + '</p>' +
             '</div>' +
-            '<div class="sd-ust__halka">' + halka(oran, 72) + '<span class="sd-ust__yuzde">%' + Math.round(oran * 100) + '</span></div>' +
+            '<div class="sd-ust__halka">' + halka(oran, 72) + '<span class="sd-ust__yuzde">' + (bekle ? YER : '%' + Math.round(oran * 100)) + '</span></div>' +
             '</header>' +
             ilerleme +
             (d.dbYok ? '<p class="sd-uyari">Döngü kaydı için veritabanı güncellemesi bekleniyor; ürün çekme çalışır, son çekim zamanı bu cihazda tutulur.</p>' : '');
     }
 
     function filtreHtml(liste) {
+        var bekle = yukleniyorMu(liste);
         var say = {};
         liste.forEach(function (x) { say[x.kod] = (say[x.kod] || 0) + 1; });
         return FILTRELER.map(function (f) {
             var n = f[2] ? f[2].reduce(function (t, k) { return t + (say[k] || 0); }, 0) : liste.length - (say.pasif || 0);
             return '<button type="button" role="tab" class="sd-filtre" aria-selected="' + (d.filtre === f[0]) + '" data-sd="filtre" data-deger="' + f[0] + '">' +
-                kacir(f[1]) + '<span class="sd-filtre__sayi">' + n + '</span></button>';
+                kacir(f[1]) + '<span class="sd-filtre__sayi">' + (bekle && f[0] !== 'tumu' ? YER : n) + '</span></button>';
         }).join('');
     }
 
@@ -1822,8 +1847,9 @@
             el.querySelector('.sd-kart__gorsel').innerHTML = g ? '<img src="' + kacir(g) + '" alt="" loading="lazy" decoding="async">' : SVG.kutu;
             el.__g = g;
         }
-        var r = DURUM[x.kod].renk;
-        var alt = durumAlt(x);
+        var bekle = x.st && x.st.yukleniyor && yukleniyorMu([x]);
+        var r = bekle ? 'gri' : DURUM[x.kod].renk;
+        var alt = bekle ? 'Sayımlar yükleniyor' : durumAlt(x);
         var imza = r + '|' + alt;
         var cubuk = el.querySelector('.sd-kart__cubuk > span');
         if (el.__imza !== imza) {
@@ -2173,6 +2199,8 @@
         document.addEventListener('visibilitychange', function () {
             if (document.visibilityState === 'visible' && d.mod) dbYukle(true);
         });
+        // Bütün tabloların sayımları indi: yer tutucular gerçek sayılara döner
+        window.addEventListener('jb:sayim-isindi', function () { gecikmeliCiz(); bantZamanla(); });
 
         // Sayfa her açılışta Sayım sekmesinde açılır; Döngü kaldığı yerden açılmaz
         try { localStorage.removeItem(MOD_ANAHTARI); } catch (e) { /* yok */ }

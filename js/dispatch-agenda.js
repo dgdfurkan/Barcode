@@ -29,6 +29,11 @@ class DispatchAgendaApp {
         this._searchDebounce = null;
         this._searchHighlight = -1;
         this._yuklemeHatali = false;
+        /* Yerel değişiklik sayacı: yükleme sürerken ekle/sil/güncelle olduysa
+           o yükleme (değişiklikten önceki liste) çöpe gider, yazmalar bitince
+           liste yeniden istenir. Yoksa silinen kayıt geri gelirdi. */
+        this._degisim = 0;
+        this._yenidenYukle = false;
     }
 
     async init() {
@@ -268,6 +273,7 @@ class DispatchAgendaApp {
             this._listeCiz();
             return;
         }
+        const damga = this._degisim;
         try {
             const { data, error } = await window.jbDb
                 .from('dispatch_agenda_items')
@@ -275,9 +281,20 @@ class DispatchAgendaApp {
                 .eq('username', this._username)
                 .order('created_at', { ascending: false });
             if (error) throw error;
-            this.items = Array.isArray(data) ? data : [];
+            if (damga !== this._degisim || this._yaziyor) {
+                // Bu liste yerel değişiklikten önce istendi: bayat
+                this._yenidenYukle = true;
+                return;
+            }
+            const silinecek = this._silinecekler();
+            const gelen = Array.isArray(data) ? data : [];
+            this.items = gelen.filter((x) => !silinecek.has(String(x.id)));
             this._yuklemeHatali = false;
             this._sunucudanGeldi = true;
+            // Önceki açılışta sunucuya ulaşmamış "Tamamlandı"lar yeniden gönderilir
+            const kalan = gelen.filter((x) => silinecek.has(String(x.id)));
+            if (kalan.length) void this._silinecekleriGonder(kalan.map((x) => String(x.id)));
+            else if (silinecek.size) this._silinecekYaz(new Set());
         } catch (e) {
             console.error('Ajanda yüklenemedi:', e);
             // Önbellekten çizilmiş liste varsa hata ekranıyla silinmesin
@@ -296,8 +313,48 @@ class DispatchAgendaApp {
     _kayitOnbellegi() {
         try {
             const v = JSON.parse(localStorage.getItem(this._onbellekAnahtari()) || 'null');
-            return v && Array.isArray(v.items) && v.items.length ? v.items : null;
+            if (!(v && Array.isArray(v.items) && v.items.length)) return null;
+            const silinecek = this._silinecekler();
+            return v.items.filter((x) => !silinecek.has(String(x.id)));
         } catch (e) { return null; }
+    }
+
+    /* Tamamlandı denip sunucuda silindiği doğrulanmamış kayıtlar. Sayfa yazma
+       bitmeden kapanırsa bir sonraki açılışta gösterilmez ve yeniden silinir. */
+    _silinecekAnahtari() { return 'jb_ajanda_silinecek_' + this._username; }
+
+    _silinecekler() {
+        try {
+            const v = JSON.parse(localStorage.getItem(this._silinecekAnahtari()) || '[]');
+            return new Set(Array.isArray(v) ? v.map(String) : []);
+        } catch (e) { return new Set(); }
+    }
+
+    _silinecekYaz(kume) {
+        try {
+            if (kume.size) localStorage.setItem(this._silinecekAnahtari(), JSON.stringify([...kume].slice(-200)));
+            else localStorage.removeItem(this._silinecekAnahtari());
+        } catch (e) { /* kota */ }
+    }
+
+    /** Siler ve sunucuda gerçekten gittiğini doğrular; gitmediyse hata fırlatır */
+    async _sunucudanSil(id) {
+        const { data, error } = await window.jbDb.from('dispatch_agenda_items').delete()
+            .eq('id', id).eq('username', this._username).select('id');
+        if (error) throw error;
+        if (Array.isArray(data) && data.length) return;
+        // Hiç satır dönmediyse ya zaten silinmiş ya da sunucu silmedi: bak
+        const kontrol = await window.jbDb.from('dispatch_agenda_items').select('id').eq('id', id).maybeSingle();
+        if (kontrol.error) throw kontrol.error;
+        if (kontrol.data) throw new Error('Sunucu kaydı silmedi');
+    }
+
+    async _silinecekleriGonder(idler) {
+        const kume = this._silinecekler();
+        for (const id of idler) {
+            try { await this._sunucudanSil(id); kume.delete(id); } catch (e) { console.warn('Ajanda: bekleyen silme yine olmadı', e); }
+        }
+        this._silinecekYaz(kume);
     }
 
     _kayitOnbellegeYaz() {
@@ -636,6 +693,7 @@ class DispatchAgendaApp {
         this.form.urun = { id: String(this._productId(p)), ad: this._productName(p), gorsel: this._productImage(p), barkod: this._productBarcode(p), barkodlar: Array.isArray(p.barcodes) ? p.barcodes : [] };
         document.getElementById('ajAra').hidden = true;
         this._formDoldur({ adet: 1, tarih: this._bugun(), not: '', al: false, adres: '', zil: false });
+        this._zatenVarYaz();
         this._degisimDenetle();
         setTimeout(() => { const q = document.getElementById('addQuantity'); q.focus(); q.select(); }, 60);
     }
@@ -656,6 +714,7 @@ class DispatchAgendaApp {
         this.form.tur = tur === 'fazla' ? 'fazla' : 'eksik';
         document.querySelectorAll('#ajForm [data-tur]').forEach((b) => b.setAttribute('aria-checked', String(b.getAttribute('data-tur') === this.form.tur)));
         document.getElementById('ajSebepAlan').hidden = this.form.tur === 'fazla';
+        this._zatenVarYaz();
         this._degisimDenetle();
     }
 
@@ -724,6 +783,7 @@ class DispatchAgendaApp {
     }
 
     async _arkadaYaz(is, geriAl, hataYazi) {
+        this._degisim++;
         this._yaziyor = (this._yaziyor || 0) + 1;
         try {
             await is();
@@ -735,7 +795,38 @@ class DispatchAgendaApp {
             window.JBDiyalog?.bildir(hataYazi, 'hata');
         } finally {
             this._yaziyor--;
+            // Yazmalar sürerken gelen liste atıldıysa şimdi tazesi istenir
+            if (!this._yaziyor && this._yenidenYukle) {
+                this._yenidenYukle = false;
+                void this.loadItems();
+            }
         }
+    }
+
+    /** Aynı ürünün aynı türde (eksik/fazla) açık kaydı */
+    _ayniKayit(urunId, tur) {
+        const fazla = tur === 'fazla';
+        return this.items.find((x) => String(x.product_id) === String(urunId) && this._fazlaMi(x) === fazla) || null;
+    }
+
+    /* Ekle formunda ürün seçilince: ajandada zaten varsa söylenir, kaydedince
+       adet üstüne eklenir. Öteki türde varsa ayrı kayıt açılacağı söylenir. */
+    _zatenVarYaz() {
+        const el = document.getElementById('ajZaten');
+        if (!el) return;
+        if (!this.form || this.form.mod !== 'ekle' || !this.form.urun) { el.hidden = true; return; }
+        const tur = this.form.tur;
+        const ayni = this._ayniKayit(this.form.urun.id, tur);
+        const oteki = ayni ? null : this._ayniKayit(this.form.urun.id, tur === 'fazla' ? 'eksik' : 'fazla');
+        const kayit = ayni || oteki;
+        if (!kayit) { el.hidden = true; return; }
+        const adet = Number(kayit.quantity) || 0;
+        const g = this._gunBasligi(this._dateKey(kayit));
+        const ad = tur === 'fazla' ? 'fazla' : 'eksik';
+        el.textContent = ayni
+            ? `Bu ürün ajandada zaten var: ${adet} adet ${ad} (${g.ad}). Kaydedersen yazdığın adet üstüne eklenir.`
+            : `Bu ürün ajandada ${adet} adet ${tur === 'fazla' ? 'eksik' : 'fazla'} olarak var. ${tur === 'fazla' ? 'Fazla' : 'Eksik'} için ayrı kayıt açılır.`;
+        el.hidden = false;
     }
 
     kaydet() {
@@ -760,6 +851,31 @@ class DispatchAgendaApp {
         const u = this.form.urun;
         const eski = this.form.item;
         void this.formKapat(true);
+
+        // Aynı ürün aynı türde zaten açık: yeni kayıt yerine adet üstüne
+        const varOlan = mod === 'ekle' ? this._ayniKayit(u.id, v.tur) : null;
+        if (varOlan) {
+            const once = { ...varOlan };
+            const yeniAdet = Math.min(999, (Number(varOlan.quantity) || 0) + v.adet);
+            const deg = { quantity: yeniAdet, updated_at: ortak.updated_at };
+            if (v.not) deg.reason_note = varOlan.reason_note ? `${varOlan.reason_note} · ${v.not}` : v.not;
+            if (v.al && !varOlan.pickup_required) { deg.pickup_required = true; deg.address = v.adres || varOlan.address || null; }
+            const zilAc = v.zil && !this._hatirlaticiAcikMi(varOlan);
+            Object.assign(varOlan, deg);
+            if (zilAc) varOlan.reminder = true;
+            this._listeCiz();
+            this._zilOnbellegi();
+            window.JBDiyalog?.bildir(`Zaten ajandadaydı, adet ${Number(once.quantity) || 0} → ${yeniAdet} oldu`, 'basari');
+            void this._arkadaYaz(async () => {
+                const { error } = await window.jbDb.from('dispatch_agenda_items').update(deg).eq('id', varOlan.id).eq('username', this._username);
+                if (error) throw error;
+                if (H && zilAc) await H.ayarla(varOlan.id, true);
+            }, () => {
+                Object.keys(varOlan).forEach((k) => { delete varOlan[k]; });
+                Object.assign(varOlan, once);
+            }, 'Adet eklenemedi');
+            return;
+        }
 
         if (mod === 'ekle') {
             const row = {
@@ -809,19 +925,25 @@ class DispatchAgendaApp {
         const tamam = await window.JBDiyalog?.onay(`${item.product_name || 'Bu ürün'} ajandadan kaldırılacak.`, { baslik: 'Tamamlandı mı?', onayYazi: 'Tamamlandı', vazgecYazi: 'Vazgeç' });
         if (!tamam || this.form?.item !== item) return;
         const sira = this.items.indexOf(item);
+        const id = String(item.id);
         this.items = this.items.filter((x) => x !== item);
+        const bekleyen = this._silinecekler();
+        bekleyen.add(id);
+        this._silinecekYaz(bekleyen);
         void this.formKapat(true);
         this._listeCiz();
         window.JBAjandaHatirlatici?.kaldirildi(item.id);
         this._zilOnbellegi();
         window.JBDiyalog?.bildir('Kayıt kapatıldı', 'basari');
+        const birak = () => { const k = this._silinecekler(); k.delete(id); this._silinecekYaz(k); };
         void this._arkadaYaz(async () => {
-            const { error } = await window.jbDb.from('dispatch_agenda_items').delete().eq('id', item.id).eq('username', this._username);
-            if (error) throw error;
+            await this._sunucudanSil(id);
+            birak();
         }, () => {
+            birak();
             this.items.splice(Math.max(0, Math.min(sira, this.items.length)), 0, item);
             if (item.reminder) window.JBAjandaHatirlatici?.eklendi(item.id, true);
-        }, 'Kayıt kapatılamadı');
+        }, 'Kayıt kapatılamadı, sunucu silmedi. Tekrar dene.');
     }
 
     // Ürün arama sonuçları
