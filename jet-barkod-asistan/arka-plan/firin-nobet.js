@@ -18,6 +18,8 @@
  * Chrome alarmı en az 30 sn. 15 sn için sipariş panosu nöbetçisinin
  * (pano-nobet.js) 2 sn'lik nabzına bağlanıyor: her nabızda süre dolmuş mu
  * diye bakılıyor. Alarm yalnız hizmet işçisi uyursa uyandırmak için.
+ * Kritik stok alarmı çalarken (firin-ses.js) kontrol 5 sn'de bir: ürün rafa
+ * eklenince bildirim ve alarm hemen kalksın.
  * Öneriler 08:00-23:00 arası. 23:30-23:59 arası 10 sn'de bir "Fırın Ürünlerini
  * Çıkar" uyarısı (rafta stoğu olan, ekmek hariç). Diğer saatlerde istek yok.
  *
@@ -34,7 +36,8 @@ const AYAR_ANAHTARI = 'jbaFirinNobet';
 const VARSAYILAN = { acik: true, sn: 15 };
 const ALARM = 'jba-firin-nobet';
 const PANO = 'https://warehouse.getir.com/r/*/dashboard/orders*';
-const EN_AZ_ARA_MS = 10 * 1000;
+const EN_AZ_ARA_MS = 4 * 1000;
+const KRITIK_SN = 5;
 const HATA_BEKLEME_MS = 2 * 60 * 1000;
 const SATIS_GECIKMESI_MS = 20 * 1000;
 const SIM_SURE_MS = 20 * 1000;
@@ -46,6 +49,7 @@ let calisiyor = false;
 let sonKontrol = 0;
 let sonHata = 0;
 let satisZamanlayici = null;
+let kritikZamanlayici = null;
 let ayar = Object.assign({}, VARSAYILAN);
 let geceTemizlendi = false;
 
@@ -96,8 +100,12 @@ function gunSonuMu() {
     const d = new Date();
     return d.getHours() === 23 && d.getMinutes() >= 30;
 }
+function kritikMi() {
+    try { return typeof globalThis.jbaFirinKritikVar === 'function' && globalThis.jbaFirinKritikVar(); } catch (e) { return false; }
+}
 function aralikSn() {
-    return gunSonuMu() ? CIKAR_SN : ayar.sn;
+    if (gunSonuMu()) return CIKAR_SN;
+    return kritikMi() ? Math.min(KRITIK_SN, ayar.sn) : ayar.sn;
 }
 
 async function panolar() {
@@ -111,7 +119,7 @@ async function yay(sekmeler, sonuc, ek) {
         dilimler: sonuc && sonuc.dilimler,
         simdiki: sonuc && sonuc.simdiki,
         // Çarpıyla kapatılan kart bu kadar sonra yeniden gösterilir (seçilen sıklık)
-        aralikMs: aralikSn() * 1000,
+        aralikMs: (gunSonuMu() ? CIKAR_SN : ayar.sn) * 1000,
         mod: sonuc && sonuc.mod,
         zaman: Date.now()
     }, ek || {});
@@ -170,6 +178,10 @@ async function kontrol(sebep) {
             durumYaz(sebepMetni(cevap));
             return;
         }
+        // Pişirme önerisinden düşmüş ama donuğu gelmiş La Lorraine ürünleri (firin-tedarik.js)
+        if (!gunSonu && typeof globalThis.jbaFirinListeDisi === 'function') {
+            await globalThis.jbaFirinListeDisi(cevap, hedef.id);
+        }
         await yay(await panolar(), cevap);
         // Fırın sesi: ürün adları, kritik satış ve gün sonu durumu (firin-ses.js)
         if (typeof globalThis.jbaFirinKontrolSonucu === 'function') {
@@ -187,6 +199,9 @@ async function kontrol(sebep) {
         durumYaz(sebepMetni(null));
     } finally {
         calisiyor = false;
+        // Kritik alarmda nabzın 2 sn adımını beklemeden tam 5 sn sonra
+        clearTimeout(kritikZamanlayici);
+        if (kritikMi()) kritikZamanlayici = setTimeout(() => globalThis.jbaFirinNabiz(), Math.max(0, KRITIK_SN * 1000 - (Date.now() - sonKontrol)) + 20);
     }
 }
 

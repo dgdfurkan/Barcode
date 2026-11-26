@@ -19,7 +19,9 @@
  * eklenince bildirimden çıkar ve alarm o ürün için biter. Bildirim kartından
  * ertelenen ya da Asistan penceresinden susturulan ürün de çalmaz. "En çok"
  * süresi seçildiyse o kadar sonra durur. Fırın bildirimi açık olmalı: karar
- * onun kontrolünden gelir; son kontrol 2 dk'dan eskiyse alarm beklemede kalır.
+ * onun kontrolünden gelir. Alarm sürerken fırın 5 sn'de bir kontrol edilir ve
+ * ses yalnız kontrolün hemen ardından, ürün hâlâ bildirimdeyse çalar; ürün
+ * eklenip bildirimden çıkınca çalan ses de kesilir.
  *
  * GÜN SONU
  * 23:30'da "fırın ürünlerini çıkar" sesi: seçilen ses, uzunluk (3/5/10 sn) ve
@@ -53,7 +55,7 @@ const PANEL = 'https://warehouse.getir.com/*';
 const SATIS_ARA_MS = 6 * 1000;
 const KRITIK_EN_ERKEN_MS = 15 * 1000;
 const KRITIK_EN_GEC_MS = 3 * 60 * 1000;
-const KONTROL_TAZE_MS = 2 * 60 * 1000;
+const KRITIK_KARAR_MS = 3 * 1000;
 const ADLAR_ANAHTARI = 'jbaFirinAdlari';
 const DURUM_ANAHTARI = 'jbaFirinAlarm';
 const FIRIN_URUNU = /f[ıi]r[ıi]n|unlu|simit|po[ğg]a[çc]a|b[öo]rek|kruvasan|croissant|pi[şs]i|açma|acma|kek\b|muffin|baget|pide/i;
@@ -64,6 +66,8 @@ let firinAdlari = new Set();
 let tazeAdlar = new Set();
 let sonSatisSesi = 0;
 let calmaBitis = 0;
+/* Çalan ses kritik alarm mı: ürün eklenince yalnız o kesilir */
+let kritikBitis = 0;
 let sonCikar = null; // { zaman, sayi }
 let sonKontrol = 0;
 /* Satılıp kararı beklenen ürünler: sade ad -> satış zamanı */
@@ -163,12 +167,13 @@ async function panelAcikMi() {
     try { return (await chrome.tabs.query({ url: PANEL })).length > 0; } catch (e) { return false; }
 }
 
-async function cal(ses, tekrar, sure, metin) {
+async function cal(ses, tekrar, sure, metin, kritik) {
     try {
         if (!(await sesBelgesi())) return false;
         const c = await chrome.runtime.sendMessage({ type: 'JBA_SES_CAL', hedef: 'ses-belgesi', ses, tekrar, sure, duzey: ayar.duzey });
         if (c && c.ok) {
             calmaBitis = Date.now() + (Number(c.sure) || 0);
+            kritikBitis = kritik ? calmaBitis : 0;
             chrome.storage.local.set({ jbaFirinSesSon: { zaman: Date.now(), metin } }).catch(() => {});
             return true;
         }
@@ -183,6 +188,7 @@ globalThis.jbaSesCal = async function (ses, tekrar, sure, duzey) {
     try {
         if (!(await sesBelgesi())) return false;
         const c = await chrome.runtime.sendMessage({ type: 'JBA_SES_CAL', hedef: 'ses-belgesi', ses, tekrar, sure, duzey: duzey || ayar.duzey || 100 });
+        if (c && c.ok) kritikBitis = 0;
         return !!(c && c.ok);
     } catch (e) {
         return false;
@@ -230,6 +236,21 @@ globalThis.jbaFirinAdiMi = function (u) { return firinUrunuMu(u); };
 // Kritik stok alarmı
 // ------------------------------------------------------------------
 
+/** Çalan kritik alarmı keser (ürün eklendi ya da susturuldu) */
+function kritikSesiKes() {
+    if (Date.now() >= kritikBitis) return;
+    kritikBitis = 0;
+    calmaBitis = 0;
+    chrome.runtime.sendMessage({ type: 'JBA_SES_DUR', hedef: 'ses-belgesi' }).catch(() => {});
+}
+
+const calacakVar = () => [...aktif.keys()].some((k) => !susturulan.has(k));
+
+/** firin-nobet.js: alarm sürerken kontrol 5 sn'de bir */
+globalThis.jbaFirinKritikVar = function () {
+    return ayar.kritik && satisSaatiMi() && calacakVar();
+};
+
 function durumYaz() {
     const liste = [...aktif.values()].filter((x) => !susturulan.has(sade(x.ad))).map((x) => x.ad);
     chrome.storage.local.set({ [DURUM_ANAHTARI]: { zaman: Date.now(), adlar: liste } }).catch(() => {});
@@ -259,7 +280,7 @@ globalThis.jbaFirinKontrolSonucu = function (cevap, mod) {
     const kritik = new Map();
     (cevap.liste || []).forEach((u) => {
         // Yeni pişirme yönteminde yalnız öneri eksiği olan satır kritik değildir (stok var)
-        if (u && u.ad && !u.ertelendi && !u.ekmek && !u.sadeceOneri && !tazeMi(u.ad)) kritik.set(sade(u.ad), u.ad);
+        if (u && u.ad && !u.ertelendi && !u.ekmek && !u.sadeceOneri && !u.hafif && !tazeMi(u.ad)) kritik.set(sade(u.ad), u.ad);
     });
     const once = aktif.size;
     // Eklendi / pişirildi / ertelendi: alarm o ürün için biter
@@ -277,6 +298,7 @@ globalThis.jbaFirinKontrolSonucu = function (cevap, mod) {
         }
     }
     if (aktif.size !== once || once) durumYaz();
+    if (!calacakVar()) kritikSesiKes();
     if (aktif.size > once) sonAlarm = 0; // yeni ürün: aralığı beklemeden çal
     globalThis.jbaFirinSesNabiz();
 };
@@ -296,12 +318,13 @@ globalThis.jbaFirinSesNabiz = async function () {
         }
         const calacak = [...aktif.entries()].filter(([k]) => !susturulan.has(k)).map(([, a]) => a.ad);
         if (!calacak.length) return;
-        if (simdi - sonKontrol > KONTROL_TAZE_MS) return; // karar bayat: fırın kontrolü dönmüyor
+        // Yalnız taze kontrolün hemen ardından: o arada ürün eklendiyse çalmasın
+        if (simdi - sonKontrol > KRITIK_KARAR_MS) return;
         if (simdi < calmaBitis) return;
         if (sonAlarm && simdi - sonAlarm < ayar.kritikAralik * 1000) return;
         if (!(await panelAcikMi())) return;
         sonAlarm = simdi;
-        await cal(ayar.kritikSes, ayar.kritikTekrar, ayar.kritikSure, 'Kritik stok: ' + kisaListe(calacak));
+        await cal(ayar.kritikSes, ayar.kritikTekrar, ayar.kritikSure, 'Kritik stok: ' + kisaListe(calacak), true);
     } finally {
         nabizCalisiyor = false;
     }
@@ -358,6 +381,7 @@ chrome.storage.onChanged.addListener((d, alan) => {
 chrome.runtime.onMessage.addListener((m, gonderen, cevapla) => {
     if (!m || m.type !== 'JBA_FIRIN_SES_SUSTUR') return false;
     aktif.forEach((a, k) => susturulan.add(k));
+    kritikSesiKes();
     durumYaz();
     cevapla({ ok: true });
     return false;

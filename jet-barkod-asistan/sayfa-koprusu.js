@@ -700,11 +700,11 @@
     // geliyor. Kontrol panelinde aynı isteği, panelin kendi sipariş
     // isteğinden kopyalanan başlıklarla atıyoruz: jeton sayfada kalıyor,
     // dışarı çıkmıyor. Yeni sekme açılmıyor, sayfa çizilmiyor.
-    // Sıklık sınırı burada da var: 10 sn içinde ikinci istek atılmaz,
-    // son cevap döner.
+    // Sıklık sınırı burada da var: 4 sn içinde ikinci istek atılmaz,
+    // son cevap döner (kritik alarmda nöbetçi 5 sn'de bir soruyor).
     // ==================================================================
 
-    var FIRIN_ARA_MS = 8 * 1000;
+    var FIRIN_ARA_MS = 4 * 1000;
     var firinSon = null;
     var firinZaman = 0;
     var firinSuruyor = null;
@@ -774,6 +774,100 @@
                 return sonuc;
             });
         return firinSuruyor;
+    }
+
+    // ==================================================================
+    // La Lorraine tedariki (arka-plan/firin-tedarik.js, 15 dk'da bir)
+    //
+    // Depo panelinin "Tedarik Teslimat Listesi" sayfası
+    // POST /supply/filter?offset&limit { warehouses, createdAt } ve detayda
+    // GET /supply/<id>?warehouseType= atıyor. Aynı istekler panelin kendi
+    // başlıklarıyla; yalnız La Lorraine teslimatları, en çok 12 detay.
+    // Tamamlanmış teslimatın detayı değişmediği için bir kez sorulur.
+    // ==================================================================
+
+    var TEDARIK_ARA_MS = 10 * 60 * 1000;
+    var tedarikSon = null;
+    var tedarikZaman = 0;
+    var tedarikSuruyor = null;
+    var tedarikDetay = {};
+
+    function tedarikSade(id, d) {
+        var log = Array.isArray(d.statusChangeLog) ? d.statusChangeLog : [];
+        var kabul = log.filter(function (x) { return x && /^COMPLETED/.test(String(x.status || '')); })
+            .map(function (x) { return Date.parse(x.occurredAt || '') || 0; }).sort()[0] || null;
+        return {
+            id: id,
+            durum: String(d.status || ''),
+            beklenen: Date.parse(d.expectedDeliveryDate || '') || null,
+            kabul: kabul,
+            urunler: (Array.isArray(d.goods) ? d.goods : []).slice(0, 40).map(function (g) {
+                var ad = g.fullName && typeof g.fullName === 'object' ? (g.fullName.tr || g.fullName.en) : (g.fullName || (g.name && g.name.tr) || '');
+                var gorsel = g.picURL && typeof g.picURL === 'object' ? (g.picURL.tr || g.picURL.en) : g.picURL;
+                return {
+                    id: String(g.id || ''),
+                    ad: String(ad || '').slice(0, 120),
+                    gorsel: /^https:\/\//.test(gorsel || '') ? gorsel : '',
+                    siparis: Number(g.orderedCount) || 0,
+                    alinan: Number(g.acceptedCount) || 0
+                };
+            })
+        };
+    }
+
+    function tedarikListesi() {
+        if (tedarikSuruyor) return tedarikSuruyor;
+        if (tedarikSon && tedarikSon.ok && Date.now() - tedarikZaman < TEDARIK_ARA_MS) return Promise.resolve(tedarikSon);
+        var depo = depoKimligi();
+        if (!depo) return Promise.resolve({ ok: false, sebep: 'depo' });
+        if (!jetonVarMi() || !asilFetch) return Promise.resolve({ ok: false, sebep: 'oturum' });
+        var basliklar = {};
+        Object.keys(panelBasliklari).forEach(function (k) { basliklar[k] = panelBasliklari[k]; });
+        var simdi = Date.now();
+        var govde = { warehouses: [depo], createdAt: {
+            startDate: new Date(simdi - 14 * 864e5).toISOString(),
+            endDate: new Date(simdi + 2 * 864e5).toISOString()
+        } };
+        var b2 = {};
+        Object.keys(basliklar).forEach(function (k) { b2[k] = basliklar[k]; });
+        b2['content-type'] = 'application/json';
+        tedarikSuruyor = asilFetch(TEMEL + '/supply/filter?offset=0&limit=100', { method: 'POST', headers: b2, body: JSON.stringify(govde), credentials: 'include' })
+            .then(function (r) {
+                if (!r.ok) throw new Error('http ' + r.status);
+                return r.json();
+            })
+            .then(function (j) {
+                var hepsi = (j && j.data && Array.isArray(j.data.supplyInboundDeliveries)) ? j.data.supplyInboundDeliveries : [];
+                var ll = hepsi.filter(function (x) { return x && x.supplier && /lorra/i.test(String(x.supplier.name || '')) && x.id; }).slice(0, 12);
+                var sira = Promise.resolve();
+                var sonuc = [];
+                ll.forEach(function (x) {
+                    sira = sira.then(function () {
+                        var c = tedarikDetay[x.id];
+                        if (c && /^(COMPLETED|CLOSED)$/.test(c.durum)) { sonuc.push(c); return; }
+                        return asilFetch(TEMEL + '/supply/' + x.id + '?warehouseType=', { method: 'GET', headers: basliklar, credentials: 'include' })
+                            .then(function (r) { return r.ok ? r.json() : null; })
+                            .then(function (dj) {
+                                var d = dj && (dj.data || dj);
+                                if (!d || !Array.isArray(d.goods)) return;
+                                var s = tedarikSade(x.id, d);
+                                tedarikDetay[x.id] = s;
+                                sonuc.push(s);
+                            })
+                            .catch(function () { /* tek teslimat okunamadı */ })
+                            .then(function () { return new Promise(function (c2) { setTimeout(c2, 300); }); });
+                    });
+                });
+                return sira.then(function () { return { ok: true, teslimatlar: sonuc }; });
+            })
+            .catch(function (e) { return { ok: false, sebep: String(e && e.message || 'ağ').slice(0, 40) }; })
+            .then(function (s) {
+                tedarikSuruyor = null;
+                tedarikZaman = Date.now();
+                tedarikSon = s;
+                return s;
+            });
+        return tedarikSuruyor;
     }
 
     // ==================================================================
@@ -1237,6 +1331,13 @@
             var kno = d.no;
             kaldirmaListesi(d.gun).then(function (sonuc) {
                 gonder({ type: 'JB_KALDIRMA_LISTE', no: kno, sonuc: sonuc });
+            });
+            return;
+        }
+        if (d && d.type === 'JB_TEDARIK_SOR') {
+            var tno = d.no;
+            tedarikListesi().then(function (sonuc) {
+                gonder({ type: 'JB_TEDARIK', no: tno, sonuc: sonuc });
             });
             return;
         }

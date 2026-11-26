@@ -542,7 +542,8 @@
             b.textContent = saatYaz(v.zaman);
             kDurum.appendChild(b);
             var metin = v.hata ? String(v.hata)
-                : 'Planlanan ' + v.planlanan + ' · Aktif ' + v.aktif + ' · Meşgul ' + ((v.sayi && v.sayi.mesgul) || 0);
+                : 'Planlanan ' + v.planlanan + ' · Aktif ' + v.aktif + ' · Meşgul ' + ((v.sayi && v.sayi.mesgul) || 0) +
+                    (v.sayi && v.sayi.iade ? ' · İadede ' + v.sayi.iade : '');
             kDurum.appendChild(document.createTextNode(' · ' + metin));
         };
         chrome.storage.local.get('jbaKuryeDurum', function (r) { kDurumCiz(r && r.jbaKuryeDurum); });
@@ -562,6 +563,31 @@
                 });
             });
         };
+        /* Ertelemeler: durum satırı ve sıfırlama */
+        var kErt = kEl('kuryeErteleDurum');
+        var kErtDugme = kEl('kuryeErteleSifirla');
+        var kErtKayit = null;
+        var kErtCiz = function () {
+            var e = kErtKayit || {};
+            var simdi = Date.now();
+            var parca = [];
+            if (Number(e.eksik) > simdi) parca.push('Kurye eksiği ' + Math.max(1, Math.ceil((e.eksik - simdi) / 60000)) + ' dk daha ertelendi');
+            var kisi = {};
+            Object.keys(e.mola || {}).forEach(function (k) { if (Number(e.mola[k]) > simdi) kisi[k.split(':')[0]] = 1; });
+            var n = Object.keys(kisi).length;
+            if (n) parca.push(n + ' kurye kartı ertelendi');
+            kErt.textContent = parca.length ? parca.join(' · ') : 'Ertelenen uyarı yok.';
+            kErtDugme.disabled = !parca.length;
+        };
+        chrome.storage.local.get('jbaKuryeErtele', function (r) { kErtKayit = r && r.jbaKuryeErtele; kErtCiz(); });
+        chrome.storage.onChanged.addListener(function (d, alan) {
+            if (alan === 'local' && d.jbaKuryeErtele) { kErtKayit = d.jbaKuryeErtele.newValue; kErtCiz(); }
+        });
+        setInterval(kErtCiz, 15000);
+        kErtDugme.addEventListener('click', function () {
+            kErtDugme.disabled = true;
+            chrome.runtime.sendMessage({ type: 'JBA_KURYE_ERTELE_SIFIRLA' }, function () { void chrome.runtime.lastError; });
+        });
         kDugme('kuryeSimdi', 'JBA_KURYE_SIMDI', 'Kontrol ediliyor...', 'Şimdi Kontrol Et');
         kDugme('kuryeSim', 'JBA_KURYE_SIM', 'Hazırlanıyor...', 'Simülasyonu Göster');
     }

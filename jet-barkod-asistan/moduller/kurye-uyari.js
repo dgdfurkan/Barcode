@@ -6,7 +6,7 @@
  * kurye sayılarını okuyup JBA_KURYE_UYARI gönderir. Burası iki kart çizer:
  *   - Kurye eksiği: planlanan > aktif (müsait + siparişte + geri dönen).
  *   - Uzun mola: eşikten uzun süredir meşgulde kalan kurye (fotoğrafıyla).
- * Her kartta Ertele (15 / 30 / 45 dk, 1 sa); ertelenen kart o süre gelmez,
+ * Her kartta Ertele (2 / 5 / 10 / 15 dk); ertelenen kart o süre gelmez,
  * sesi de çalmaz. Çarpı kartları bir sonraki değişikliğe kadar gizler.
  * Fırın bildirimi sağ üstte, bu sol üstte: üst üste binmez.
  * ============================================================================
@@ -18,7 +18,7 @@
     if (!JBA) return;
 
     var PANO_YOLU = /^\/r\/[a-f0-9]{24}\/dashboard\/orders\/?$/;
-    var ERTELE_DK = [15, 30, 45, 60];
+    var ERTELE_DK = [2, 5, 10, 15];
 
     var etkin = false;
     var kap = null;
@@ -120,7 +120,7 @@
 
     function erteleHtml(tur, id) {
         return '<div class="ertele"><span>Ertele</span>' + ERTELE_DK.map(function (dk) {
-            return '<button type="button" data-ertele="' + tur + '" data-id="' + kacir(id || '') + '" data-dk="' + dk + '">' + (dk === 60 ? '1 sa' : dk + ' dk') + '</button>';
+            return '<button type="button" data-ertele="' + tur + '" data-id="' + kacir(id || '') + '" data-dk="' + dk + '">' + dk + ' dk' + '</button>';
         }).join('') + '</div>';
     }
 

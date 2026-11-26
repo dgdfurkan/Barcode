@@ -10,12 +10,17 @@
  *   GET  /users/warehouses/                     depo → şehir (günde bir)
  *   GET  /warehouses/courier-plan/<şehir>       o saatin planı
  *   POST /courier/filter {isLoggedIn:true}      giriş yapmış kuryeler
+ *   GET  /return-orders                         fiziksel iade (yalnız eksik varken)
  *
  * HESAP (Getir panelinin kendi hesabı, canlı harita kodundan)
  *   Planlanan   courierPlanByCourierType değerlerinin toplamı
  *   Müsait      durum 100        Meşgul      200 ya da 4000-4200 (dolum)
  *   Siparişte   400-800          Geri dönen  900
  *   Toplam      bütün giriş yapmış kuryeler
+ * Çarşı ya da fiziksel iade işindeki kurye (currentDomainType Getir10 = 1
+ * değil) ve 300-375 (çarşı rezervasyonu) siparişte sayılır. Fiziksel iadeye
+ * çıkan kurye listeden düşebiliyor: eksik görünürse "Fiziksel İade Takip"
+ * listesindeki süren iadelerin kuryesi listede yoksa aktif sayılır.
  * Aktif = müsait + siparişte + geri dönen (meşgul hariç). Planlanan > aktif
  * ise kurye eksiği var. Bir adımda (meşgul, toplamada, yolda, adreste, geri
  * dönüyor, siparişte) kullanıcının yazdığı dakikadan uzun kalan kurye ayrıca
@@ -23,7 +28,8 @@
  * kod aralığı (400-800), oraya girişi kendimiz izliyoruz (storage.session).
  *
  * Uyarı depo panelinin sipariş ekranında sol üstte (moduller/kurye-uyari.js).
- * Ertele: eksik için, her kurye için ayrı; 15/30/45/60 dk. Ses: uyarı başlayınca
+ * Ertele: eksik için, her kurye için ayrı; 2/5/10/15 dk. Asistan'daki
+ * "Ertelemeleri Sıfırla" hepsini kaldırır. Ses: uyarı başlayınca
  * ve sürdükçe seçilen aralıkla, ertelenmişse çalmaz. Mesai 08:00-01:00.
  * ============================================================================
  */
@@ -156,11 +162,15 @@ function knNeden(c) {
     return (ad + (not && not !== ad ? ': ' + not : '')).slice(0, 60);
 }
 
-function knDurumGrubu(s) {
+function knDurumGrubu(s, alan, molaNedeni) {
     s = Number(s) || 0;
+    if (s >= 4000 && s <= 4200) return 'mesgul';
+    // Getir10 dışı iş (çarşı, fiziksel iade): kurye çalışıyor, aktif sayılır.
+    // Kendi seçtiği molada (nedenli meşgul) değilse.
+    if (alan != null && Number(alan) !== 1 && s !== 1000 && !(s === 200 && molaNedeni)) return 'sipariste';
     if (s === 100) return 'musait';
-    if (s === 200 || (s >= 4000 && s <= 4200)) return 'mesgul';
-    if (s >= 400 && s <= 800) return 'sipariste';
+    if (s === 200) return 'mesgul';
+    if (s >= 300 && s <= 800) return 'sipariste';
     if (s === 900) return 'donen';
     return 'diger';
 }
@@ -178,25 +188,68 @@ function knHesapla(plan, kuryeler, depo, simdi) {
         const bas = Date.parse(c.statusLastChangedAt || '');
         liste.push({ id: String(c._id || ''), ad: String(c.name || 'Kurye').slice(0, 60),
             foto: /^https:\/\//.test(c.picURL || '') ? c.picURL : '', status: Number(c.status) || 0,
-            bas: Number.isFinite(bas) ? bas : null, neden: knNeden(c) });
+            bas: Number.isFinite(bas) ? bas : null, neden: knNeden(c),
+            alan: c.currentDomainType != null ? Number(c.currentDomainType) : null, molaNedeni: !!c.lastBusyOption });
     });
     return knOzet(planlanan, liste, simdi);
 }
 
 /** Kurye listesinden sayılar ve meşgul listesi (gerçek ve simülasyon ortak) */
 function knOzet(planlanan, liste, simdi) {
-    const sayi = { toplam: 0, musait: 0, sipariste: 0, donen: 0, mesgul: 0 };
+    const sayi = { toplam: 0, musait: 0, sipariste: 0, donen: 0, mesgul: 0, iade: 0 };
     const mola = [];
     liste.forEach((k) => {
         k.dk = k.bas != null ? Math.max(0, Math.floor((simdi - k.bas) / 60000)) : null;
         if (k.grupBas != null) k.dkGrup = Math.max(0, Math.floor((simdi - k.grupBas) / 60000));
         sayi.toplam++;
-        const g = knDurumGrubu(k.status);
+        const g = knDurumGrubu(k.status, k.alan, k.molaNedeni);
         if (g !== 'diger') sayi[g]++;
         if (g === 'mesgul') mola.push({ id: k.id, ad: k.ad, foto: k.foto, dk: k.dk, neden: k.neden });
     });
     const aktif = sayi.musait + sayi.sipariste + sayi.donen;
     return { planlanan, aktif, eksik: Math.max(0, planlanan - aktif), sayi, mola, kuryeler: liste, zaman: simdi };
+}
+
+/* Fiziksel iade: süren iadenin kuryesi giriş yapmış kurye listesinde yoksa
+   (iadeye çıkınca listeden düşüyor) aktif sayılır. Liste yalnız eksik varken,
+   en çok dakikada bir sorulur. 3 = teslim edildi, 5 = iptal. */
+const KN_IADE_BITTI = [3, 5];
+const KN_IADE_SURE_MS = 2 * 60 * 60 * 1000;
+let knIadeOnbellek = { zaman: 0, depo: '', liste: [] };
+const knSade = (s) => String(s || '').toLocaleLowerCase('tr').replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+
+async function knIadeler(o) {
+    if (knIadeOnbellek.depo === o.depo && Date.now() - knIadeOnbellek.zaman < 60000) return knIadeOnbellek.liste;
+    const bas = new Date(); bas.setHours(0, 0, 0, 0);
+    const son = new Date(); son.setHours(23, 59, 59, 999);
+    const q = new URLSearchParams({ limit: '20', offset: '0', warehouseId: o.depo, createdAtStart: bas.toISOString(), createdAtEnd: son.toISOString() });
+    let liste = [];
+    try {
+        const j = await knGetir(o, '/return-orders?' + q.toString());
+        liste = (j && Array.isArray(j.data) ? j.data : []).map((x) => ({
+            kurye: knSade(x.courierName), durum: Number(x.status), zaman: Date.parse(x.createdDate || '') || 0,
+        }));
+    } catch (e) {
+        if (e && e.kod === 'oturum') throw e;
+    }
+    knIadeOnbellek = { zaman: Date.now(), depo: o.depo, liste };
+    return liste;
+}
+
+async function knIadeEkle(o, sonuc) {
+    if (!sonuc || sonuc.eksik <= 0) return;
+    const gorunen = new Set(sonuc.kuryeler.map((k) => knSade(k.ad)));
+    const simdi = Date.now();
+    const kisi = new Set();
+    (await knIadeler(o)).forEach((x) => {
+        if (!x.kurye || KN_IADE_BITTI.includes(x.durum) || simdi - x.zaman > KN_IADE_SURE_MS) return;
+        if (!gorunen.has(x.kurye)) kisi.add(x.kurye);
+    });
+    if (!kisi.size) return;
+    sonuc.sayi.iade = kisi.size;
+    sonuc.sayi.toplam += kisi.size;
+    sonuc.aktif += kisi.size;
+    sonuc.eksik = Math.max(0, sonuc.planlanan - sonuc.aktif);
 }
 
 /** "Siparişte" bir kod aralığı: kuryenin aralığa girdiği an izlenir */
@@ -288,6 +341,7 @@ async function knKontrol(zorla) {
         const plan = await knGetir(o, '/warehouses/courier-plan/' + sehir + '?currentDate=' + saatBasi.getTime());
         const kur = await knGetir(o, '/courier/filter', { isLoggedIn: true });
         knSon = knHesapla(plan, kur && kur.couriers, o.depo, Date.now());
+        await knIadeEkle(o, knSon);
         await knGrupTakip(knSon);
         const mesaj = await knUyari(knSon, false);
         await knYay(mesaj, sekmeler);
@@ -374,7 +428,7 @@ chrome.runtime.onMessage.addListener((m, gonderen, cevapla) => {
     if (m.type === 'JBA_KURYE_ERTELE') {
         (async () => {
             const e = await knErteleOku();
-            const bitis = Date.now() + Math.max(5, Math.min(240, Number(m.dk) || 15)) * 60000;
+            const bitis = Date.now() + Math.max(1, Math.min(60, Number(m.dk) || 5)) * 60000;
             if (m.tur === 'eksik') e.eksik = bitis;
             else if (m.tur === 'mola' && m.id) {
                 e.mola = e.mola || {};
@@ -383,6 +437,21 @@ chrome.runtime.onMessage.addListener((m, gonderen, cevapla) => {
             }
             await chrome.storage.local.set({ [KN_ERTELE]: e });
             if (knSon) await knYay(await knUyari(knSon, false));
+            cevapla({ ok: true });
+        })();
+        return true;
+    }
+    if (m.type === 'JBA_KURYE_ERTELE_SIFIRLA') {
+        (async () => {
+            await chrome.storage.local.set({ [KN_ERTELE]: { eksik: 0, mola: {} } });
+            // Kartlar hemen geri gelsin; ses yeni uyarı gibi hemen çalsın
+            knOncekiImza = '';
+            knSonSes = 0;
+            if (knSon) {
+                const mesaj = await knUyari(knSon, false);
+                await knYay(mesaj);
+                await knSes(mesaj);
+            }
             cevapla({ ok: true });
         })();
         return true;

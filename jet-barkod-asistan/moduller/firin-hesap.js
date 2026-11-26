@@ -429,7 +429,48 @@
       return ad;
     }
 
+    /* La Lorraine ürünü: donuğu bitince ertesi gün pişirme önerisinden düşüyor,
+       yeniden geldiğinde listeye dönmüyor (arka-plan/firin-tedarik.js) */
+    function laLorraineMi(ad) {
+      return /^\s*la\s+lorraine\b/i.test(ad || '');
+    }
+
+    /* Sayfa köprüsüne tedarik listesini sor (sayfa-koprusu.js tedarikListesi) */
+    var tedarikNo = 0;
+    function tedarikSor() {
+      return new Promise(function (coz) {
+        var no = 't' + Date.now() + '-' + (++tedarikNo);
+        var bitti = false;
+        function dinle(e) {
+          if (e.source !== global || e.origin !== global.location.origin) return;
+          var d = e.data;
+          if (!d || d.type !== 'JB_TEDARIK' || d.no !== no) return;
+          bitir(d.sonuc || { ok: false });
+        }
+        function bitir(v) {
+          if (bitti) return;
+          bitti = true;
+          global.removeEventListener('message', dinle);
+          coz(v);
+        }
+        global.addEventListener('message', dinle);
+        setTimeout(function () { bitir({ ok: false, sebep: 'zaman aşımı' }); }, 30000);
+        global.postMessage({ type: 'JB_TEDARIK_SOR', no: no }, global.location.origin);
+      });
+    }
+
+    /* Arka plan (firin-tedarik.js) hangi panel sekmesi açıksa ona sorar */
+    try {
+      chrome.runtime.onMessage.addListener(function (m, gonderen, cevapla) {
+        if (!m || m.type !== 'JBA_TEDARIK_SOR') return false;
+        tedarikSor().then(cevapla);
+        return true;
+      });
+    } catch (e) { /* yetim bağlam */ }
+
     JBA.firinHesap = {
+        laLorraineMi: laLorraineMi,
+        tedarikSor: tedarikSor,
         yeniOneriler: yeniOneriler,
         yontem: function () { return yontemDegeri; },
         gunToplamlari: gunToplamlari,

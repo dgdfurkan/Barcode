@@ -1136,6 +1136,109 @@
             refreshShelfChrome();
             const view = buildViewModel(cachedProducts, settingsState);
             displayView(view);
+            if (view.mode === 'cook') laLorraineCiz();
+          }
+
+          /* La Lorraine: pişirme önerisinden düşmüş ama donuğu gelmiş ürünler ve
+             önümüzdeki 7 günün teslimatları (arka-plan/firin-tedarik.js). Cevap
+             60 sn saklanır; görünüm her yenilendiğinde yeniden istenmez. */
+          let llSon = null;
+          let llZaman = 0;
+          let llSuruyor = false;
+          function llIste(sonra) {
+            if (llSon && Date.now() - llZaman < 60000) { sonra(llSon); return; }
+            if (llSuruyor) return;
+            llSuruyor = true;
+            const adlar = cachedProducts.map((p) => p.name);
+            const bilinen = cachedProducts.filter((p) => JBA.firinHesap.laLorraineMi(p.name))
+              .map((p) => ({ ad: p.name, gorsel: p.imgSrc || '', oneriler: (p.recommendations || []).slice(0, 4) }));
+            try {
+              chrome.runtime.sendMessage({ type: 'JBA_FIRIN_LALORRAINE', adlar, bilinen }, (c) => {
+                void chrome.runtime.lastError;
+                llSuruyor = false;
+                llSon = c || { ok: false, plan: [], eksik: [] };
+                llZaman = Date.now();
+                sonra(llSon);
+              });
+            } catch (e) { llSuruyor = false; }
+          }
+          function llGun(ms) {
+            const d = new Date(ms); d.setHours(0, 0, 0, 0);
+            const bugun = new Date(); bugun.setHours(0, 0, 0, 0);
+            const fark = Math.round((d - bugun) / 864e5);
+            const tarih = d.toLocaleDateString('tr-TR', { day: 'numeric', month: 'short', weekday: 'long' });
+            return fark === 0 ? 'Bugün · ' + tarih : fark === 1 ? 'Yarın · ' + tarih : tarih;
+          }
+          function laLorraineCiz() {
+            llIste((c) => {
+              if (!resultsContainer.isConnected) return;
+              const eski = resultsContainer.querySelector('#jba-ll-blok');
+              if (eski) eski.remove();
+              const blok = document.createElement('div');
+              blok.id = 'jba-ll-blok';
+              blok.style.cssText = 'margin:0 0 16px;display:flex;flex-direction:column;gap:12px;';
+              const el = (etiket, css, metin) => {
+                const e = document.createElement(etiket);
+                if (css) e.style.cssText = css;
+                if (metin != null) e.textContent = metin;
+                return e;
+              };
+              (c.eksik || []).forEach((u) => {
+                const kart = el('div', 'display:flex;gap:12px;padding:12px;border-radius:12px;border-left:6px solid ' +
+                  (u.seviye === 'danger' ? '#ef4444;background:#fef2f2;' : '#f59e0b;background:#fffbeb;'));
+                if (/^https:\/\//.test(u.gorsel || '')) {
+                  const img = el('img', 'width:56px;height:56px;object-fit:cover;border-radius:9px;flex:none;background:#fff;');
+                  img.src = u.gorsel; img.alt = '';
+                  kart.appendChild(img);
+                }
+                const orta = el('div', 'flex:1;min-width:0;');
+                const ust = el('div', 'display:flex;align-items:center;gap:8px;');
+                ust.appendChild(el('span', 'font-size:10px;font-weight:700;padding:2px 8px;border-radius:999px;' +
+                  (u.seviye === 'danger' ? 'background:#fee2e2;color:#b42318;' : 'background:#fef3c7;color:#b45309;'),
+                  u.seviye === 'danger' ? 'ACİL PİŞİR' : 'PİŞİRME GEREKLİ'));
+                ust.appendChild(el('span', 'font-size:10px;font-weight:700;padding:2px 8px;border-radius:999px;background:#eef2ff;color:#4338ca;', 'ÖNERİDE YOK'));
+                orta.appendChild(ust);
+                orta.appendChild(el('p', 'margin:4px 0 0;font-size:15px;font-weight:700;line-height:20px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;', u.ad));
+                orta.appendChild(el('p', 'margin:2px 0 0;font-size:18px;font-weight:700;line-height:24px;color:#111827;', u.pisir + ' Adet Pişirilecek'));
+                orta.appendChild(el('p', 'margin:2px 0 0;font-size:12px;line-height:16px;color:#374151;', u.sebep));
+                kart.appendChild(orta);
+                const sag = el('div', 'flex:none;width:64px;padding-left:12px;border-left:1px solid rgba(17,24,39,.08);display:flex;flex-direction:column;justify-content:center;text-align:center;gap:8px;');
+                [['RAF', u.raf], ['GELEN', u.donuk]].forEach(([a, v]) => {
+                  const k = el('div');
+                  k.appendChild(el('div', 'font-size:10px;font-weight:600;color:#4b5563;', a));
+                  k.appendChild(el('div', 'font-size:15px;font-weight:700;font-variant-numeric:tabular-nums;', String(v)));
+                  sag.appendChild(k);
+                });
+                kart.appendChild(sag);
+                blok.appendChild(kart);
+              });
+              const plan = el('div', 'padding:12px;border:1px solid #e5e7eb;border-radius:12px;background:#fff;');
+              plan.appendChild(el('p', 'margin:0;font-size:13px;font-weight:700;line-height:18px;color:#111827;', 'La Lorraine Planı · Önümüzdeki 7 Gün'));
+              if (!c.ok) {
+                plan.appendChild(el('p', 'margin:4px 0 0;font-size:12px;line-height:16px;color:#667085;', 'Tedarik listesi okunamadı. Kontrol paneli açıkken yeniden dene.'));
+              } else if (!(c.plan || []).length) {
+                plan.appendChild(el('p', 'margin:4px 0 0;font-size:12px;line-height:16px;color:#667085;', 'Önümüzdeki 7 günde oluşturulmuş La Lorraine teslimatı yok.'));
+              } else {
+                c.plan.forEach((t) => {
+                  const g = el('div', 'margin-top:8px;padding-top:8px;border-top:1px solid #f2f4f7;');
+                  g.appendChild(el('p', 'margin:0;font-size:12px;font-weight:700;line-height:16px;color:#b45309;', llGun(t.beklenen)));
+                  const ul = el('ul', 'list-style:none;margin:4px 0 0;padding:0;display:flex;flex-direction:column;gap:2px;');
+                  t.urunler.forEach((u) => {
+                    const li = el('li', 'display:flex;justify-content:space-between;gap:12px;font-size:12px;line-height:16px;color:#374151;');
+                    li.appendChild(el('span', 'min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;', String(u.ad).replace(/^\s*la\s+lorraine\s+/i, '')));
+                    li.appendChild(el('b', 'flex:none;font-variant-numeric:tabular-nums;', u.siparis + ' adet'));
+                    ul.appendChild(li);
+                  });
+                  g.appendChild(ul);
+                  plan.appendChild(g);
+                });
+              }
+              blok.appendChild(plan);
+              // Hazırlık afişi varsa onun altına, yoksa en üste
+              const ilk = resultsContainer.firstElementChild;
+              if (ilk && /08:00-12:00 dilimi için hazırlık/.test(ilk.textContent || '')) ilk.after(blok);
+              else resultsContainer.insertBefore(blok, ilk);
+            });
           }
 
           /* Hesap ortak dosyada (moduller/firin-hesap.js); bildirim de aynısını kullanıyor */

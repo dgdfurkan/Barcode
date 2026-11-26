@@ -172,6 +172,8 @@ body.sayfa-acik .bas__nokta { background: var(--yesil); box-shadow: 0 0 0 3px rg
 .satir--durum { padding-top: 12px; border-top: 1px solid var(--cizgi); }
 .satir--durum .ayar__durum { flex: 1; }
 .satir--durum .eylem { flex: none !important; }
+.satir--ertele .ayar__durum { flex: 1; }
+.satir--ertele .eylem { flex: none !important; }
 
 .ayar__ad { margin: 0; font-size: 13px; font-weight: 700; }
 .ayar__ozet { margin: 0; font-size: 12px; line-height: 18px; color: var(--sonuk); }

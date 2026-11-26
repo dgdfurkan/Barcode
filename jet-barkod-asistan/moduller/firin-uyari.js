@@ -9,9 +9,9 @@
  * geri verir. Yeni sekme açılmaz.
  *
  * NE GÖSTERİLİYOR
- *   - Donuktan pişen ürün: pişirme panelinin ACİL / KRİTİK dediği satırlar.
- *     Rafta yok ya da raf hedefin dörtte birinin altında (öneri 6, raf 1).
- *     "Stok eksik (5/6)" gibi hafif eksik gösterilmiyor; panelde yine var.
+ *   - Donuktan pişen ürün: pişirme panelinin ACİL / KRİTİK / EKSİK dediği
+ *     satırlar. "Stok eksik (5/6)" da gösteriliyor (kullanıcı: eksik varsa
+ *     bildirim gelmeli); kritik alarm sesi yalnız ACİL ve KRİTİK'te çalar.
  *     Donukta stok yoksa gösterilmiyor (pişirilemez).
  *   - Taze üretim ekmek: rafta 10 ve altı kaldıysa.
  *
@@ -264,18 +264,23 @@
         var liste = JBA.firinHesap.oneriler(stoklu, JBA.firinHesap.ayarlar(), simdi)
             .filter(function (r) {
                 return !r.displayKind && r.amountToCook > 0 && r.frozenStock > 0 &&
-                    (r.alertLevel === 'danger' || r.alertLevel === 'urgent-prep');
+                    (r.alertLevel === 'danger' || r.alertLevel === 'urgent-prep' || r.alertLevel === 'warning');
             })
             .map(function (r) {
                 return Object.assign({
                     ad: r.name, gorsel: r.imgSrc, raf: r.currentStock, donuk: r.frozenStock,
                     oneri: r.currentTarget, pisir: r.amountToCook, seviye: r.alertLevel,
+                    // Hafif eksik: kartta görünür, kritik alarm sesi çalmaz (arka-plan/firin-ses.js)
+                    hafif: r.alertLevel === 'warning',
                     sebep: r.reason, oneriler: r.recommendations.slice(0, 4), satislar: (r.satislar || []).slice(0, 4),
                     pisenler: (r.pisenler || []).slice(0, 4)
                 }, JBA.firinHesap.gunToplamlari(r));
             });
         liste = liste.concat(ekmekSatirlari(stoklu, suan));
-        return liste.sort(function (a, b) { return (a.raf - b.raf) || (b.oneri - a.oneri); });
+        var SIRA = { danger: 0, 'urgent-prep': 0, warning: 1, 'ekmek-az': 3 };
+        return liste.sort(function (a, b) {
+            return ((SIRA[a.seviye] || 1) - (SIRA[b.seviye] || 1)) || (a.raf - b.raf) || (b.oneri - a.oneri);
+        });
     }
 
     /* Simülasyon: gerçek ürünlerden rastgele 1-4 tanesinin rafı boşaltılıyor,
@@ -349,6 +354,9 @@
                 return JBA.firinHesap.ekmekMi(p.name);
             }).map(function (p) { return p.name; }),
             stokluSayisi: urunler.filter(function (p) { return p.stokOkundu; }).length,
+            // La Lorraine ürünleri: listeden düşünce tanınsın diye arka plan saklar (firin-tedarik.js)
+            laLorraine: sim ? undefined : urunler.filter(function (p) { return JBA.firinHesap.laLorraineMi(p.name); })
+                .map(function (p) { return { ad: p.name, gorsel: p.imgSrc || '', oneriler: p.recommendations.slice(0, 4) }; }),
             dilimler: DILIM_AD,
             simdiki: JBA.firinHesap.dilim(new Date(simdi).getHours()).index,
             mod: cikar ? 'cikar' : 'pisir'
@@ -421,7 +429,7 @@
             : sayi(u.pisir) + ' Adet Pişirilecek';
         var sag = '<div><span>MEVCUT</span><b>' + sayi(u.raf) + '</b></div>' +
             (u.ekmek ? '<div><span>HEDEF</span><b>' + sayi(u.oneri) + '</b></div>'
-                     : '<div><span>DONUK</span><b>' + sayi(u.donuk) + '</b></div>');
+                     : '<div><span>' + (u.listeDisi ? 'GELEN' : 'DONUK') + '</span><b>' + sayi(u.donuk) + '</b></div>');
         var erteleHtml =
             '<div class="ertele" data-acik="0">' +
                 '<button type="button" class="ertele__ac" aria-expanded="false">' + IKON_SAAT + '<span>Ertele</span></button>' +
