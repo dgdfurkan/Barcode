@@ -100,9 +100,21 @@
                 <option value="0">Kapalı</option>
               </select>
             </div>
+            <label class="secenek"><input type="checkbox" id="firinGerekli"><span>PİŞİRME GEREKLİ satırlarını da bildir</span></label>
+            <p class="ayar__ozet">Kapalıyken yalnız ACİL PİŞİR bildirilir. Açıkken rafta olup hedefin altında kalan ürünler de gelir; alarm sesi onlarda çalmaz.</p>
             <div class="satir satir--durum">
               <p class="ayar__durum" id="firinDurum">Henüz kontrol yapılmadı.</p>
               <button type="button" class="eylem" id="firinSim">Simülasyonu Göster</button>
+            </div>
+          </div>
+        </div>
+        <div class="kart">
+          <div class="kart__bas"><h3>La Lorraine Takibi</h3><p>Depo panelinin tedarik listesi 30 dakikada bir (07:00-24:00) ve 23:35'te kendiliğinden kontrol edilir. Pişirme önerisinden düşmüş ama mal kabulle gelmiş ürün bildirimde, gelecek teslimatlar fırın sayfasındaki pişirme panelinde görünür. Geldi sayılan yalnız mal kabulde alınan adet; siparişte olup gelmeyen ürün gelmiş sayılmaz.</p></div>
+          <div class="kart__govde">
+            <label class="secenek"><input type="checkbox" id="laLorraineAcik" checked><span>La Lorraine takibi açık</span></label>
+            <div class="satir satir--durum">
+              <p class="ayar__durum" id="laLorraineDurum">Henüz kontrol yapılmadı.</p>
+              <button type="button" class="eylem" id="laLorraineSimdi">Şimdi Kontrol Et</button>
             </div>
           </div>
         </div>

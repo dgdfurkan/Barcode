@@ -191,6 +191,61 @@
         });
     }
 
+    /* PİŞİRME GEREKLİ bildirimi (moduller/firin-uyari.js, arka-plan/firin-tedarik.js); varsayılan kapalı */
+    var firinGerekli = document.getElementById('firinGerekli');
+    if (firinGerekli) {
+        chrome.storage.local.get('jbaFirinGerekli', function (r) {
+            firinGerekli.checked = !!(r && r.jbaFirinGerekli && r.jbaFirinGerekli.acik === true);
+        });
+        firinGerekli.addEventListener('change', function () {
+            chrome.storage.local.set({ jbaFirinGerekli: { acik: firinGerekli.checked } });
+        });
+    }
+
+    /* La Lorraine takibi (arka-plan/firin-tedarik.js); varsayılan açık */
+    var llAcik = document.getElementById('laLorraineAcik');
+    if (llAcik) {
+        var llDurum = document.getElementById('laLorraineDurum');
+        var llDugme = document.getElementById('laLorraineSimdi');
+        var llCiz = function (v) {
+            if (!llAcik.checked) { llDurum.textContent = 'Kapalı. Tedarik listesi sorulmuyor.'; return; }
+            if (!v || !v.metin) { llDurum.textContent = 'Henüz kontrol yapılmadı.'; return; }
+            llDurum.textContent = '';
+            if (v.zaman) {
+                var b = document.createElement('b');
+                var d = new Date(v.zaman);
+                b.textContent = 'Son kontrol ' + ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2);
+                llDurum.appendChild(b);
+                llDurum.appendChild(document.createTextNode(' · '));
+            }
+            llDurum.appendChild(document.createTextNode(String(v.metin)));
+        };
+        var llSon = null;
+        chrome.storage.local.get(['jbaLaLorraine', 'jbaLaLorraineDurum'], function (r) {
+            llAcik.checked = !(r && r.jbaLaLorraine && r.jbaLaLorraine.acik === false);
+            llDugme.disabled = !llAcik.checked;
+            llSon = r && r.jbaLaLorraineDurum;
+            llCiz(llSon);
+        });
+        llAcik.addEventListener('change', function () {
+            chrome.storage.local.set({ jbaLaLorraine: { acik: llAcik.checked } });
+            llDugme.disabled = !llAcik.checked;
+            llCiz(llSon);
+        });
+        chrome.storage.onChanged.addListener(function (d, alan) {
+            if (alan === 'local' && d.jbaLaLorraineDurum) { llSon = d.jbaLaLorraineDurum.newValue; llCiz(llSon); }
+        });
+        llDugme.addEventListener('click', function () {
+            llDugme.disabled = true;
+            llDugme.textContent = 'Kontrol ediliyor...';
+            chrome.runtime.sendMessage({ type: 'JBA_LALORRAINE_SIMDI' }, function (c) {
+                void chrome.runtime.lastError;
+                llDugme.textContent = c && c.ok ? 'Tamam' : 'Olmadı';
+                setTimeout(function () { llDugme.disabled = !llAcik.checked; llDugme.textContent = 'Şimdi Kontrol Et'; }, 3000);
+            });
+        });
+    }
+
     /* Pişirme yöntemi (moduller/firin-uyari.js okuyor) */
     var YONTEM_VARSAYILAN = { ad: 'eski', hesap: 'toplam', cikar: 'kadar', esik: 1 };
     var yontemKok = document.getElementById('katYontem');

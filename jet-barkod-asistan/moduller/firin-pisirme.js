@@ -1174,6 +1174,8 @@
               if (!resultsContainer.isConnected) return;
               const eski = resultsContainer.querySelector('#jba-ll-blok');
               if (eski) eski.remove();
+              // Asistan > Fırın > La Lorraine Takibi kapalı
+              if (c.kapali) return;
               const blok = document.createElement('div');
               blok.id = 'jba-ll-blok';
               blok.style.cssText = 'margin:0 0 16px;display:flex;flex-direction:column;gap:12px;';
@@ -1213,20 +1215,28 @@
                 blok.appendChild(kart);
               });
               const plan = el('div', 'padding:12px;border:1px solid #e5e7eb;border-radius:12px;background:#fff;');
-              plan.appendChild(el('p', 'margin:0;font-size:13px;font-weight:700;line-height:18px;color:#111827;', 'La Lorraine Planı · Önümüzdeki 7 Gün'));
+              plan.appendChild(el('p', 'margin:0;font-size:13px;font-weight:700;line-height:18px;color:#111827;', 'La Lorraine Takibi'));
+              plan.appendChild(el('p', 'margin:2px 0 0;font-size:11px;line-height:16px;color:#667085;',
+                'Planlılarda sipariş adedi, gelenlerde mal kabulde alınan adet.' + (c.zaman ? ' Son kontrol ' + new Date(c.zaman).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }) + '.' : '')));
               if (!c.ok) {
                 plan.appendChild(el('p', 'margin:4px 0 0;font-size:12px;line-height:16px;color:#667085;', 'Tedarik listesi okunamadı. Kontrol paneli açıkken yeniden dene.'));
               } else if (!(c.plan || []).length) {
-                plan.appendChild(el('p', 'margin:4px 0 0;font-size:12px;line-height:16px;color:#667085;', 'Önümüzdeki 7 günde oluşturulmuş La Lorraine teslimatı yok.'));
+                plan.appendChild(el('p', 'margin:4px 0 0;font-size:12px;line-height:16px;color:#667085;', 'Önümüzdeki 7 günde planlı La Lorraine teslimatı yok.'));
               } else {
                 c.plan.forEach((t) => {
+                  const geldi = t.durum === 'geldi';
                   const g = el('div', 'margin-top:8px;padding-top:8px;border-top:1px solid #f2f4f7;');
-                  g.appendChild(el('p', 'margin:0;font-size:12px;font-weight:700;line-height:16px;color:#b45309;', llGun(t.beklenen)));
+                  g.appendChild(el('p', 'margin:0;font-size:12px;font-weight:700;line-height:16px;color:' + (geldi ? '#047857' : '#b45309') + ';',
+                    geldi ? 'Geldi · ' + llGun(t.kabul) + ' ' + new Date(t.kabul).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })
+                          : 'Planlı · ' + llGun(t.beklenen)));
                   const ul = el('ul', 'list-style:none;margin:4px 0 0;padding:0;display:flex;flex-direction:column;gap:2px;');
                   t.urunler.forEach((u) => {
                     const li = el('li', 'display:flex;justify-content:space-between;gap:12px;font-size:12px;line-height:16px;color:#374151;');
                     li.appendChild(el('span', 'min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;', String(u.ad).replace(/^\s*la\s+lorraine\s+/i, '')));
-                    li.appendChild(el('b', 'flex:none;font-variant-numeric:tabular-nums;', u.siparis + ' adet'));
+                    if (!geldi) li.appendChild(el('b', 'flex:none;font-variant-numeric:tabular-nums;', u.siparis + ' sipariş'));
+                    else if (!(u.alinan > 0)) li.appendChild(el('b', 'flex:none;color:#b42318;', 'Gelmedi · sipariş ' + u.siparis));
+                    else li.appendChild(el('b', 'flex:none;font-variant-numeric:tabular-nums;' + (u.alinan < u.siparis ? 'color:#b45309;' : ''),
+                      u.alinan + ' / ' + u.siparis + ' geldi'));
                     ul.appendChild(li);
                   });
                   g.appendChild(ul);

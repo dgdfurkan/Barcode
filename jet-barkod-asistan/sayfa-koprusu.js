@@ -815,9 +815,9 @@
         };
     }
 
-    function tedarikListesi() {
+    function tedarikListesi(zorla) {
         if (tedarikSuruyor) return tedarikSuruyor;
-        if (tedarikSon && tedarikSon.ok && Date.now() - tedarikZaman < TEDARIK_ARA_MS) return Promise.resolve(tedarikSon);
+        if (!zorla && tedarikSon && tedarikSon.ok && Date.now() - tedarikZaman < TEDARIK_ARA_MS) return Promise.resolve(tedarikSon);
         var depo = depoKimligi();
         if (!depo) return Promise.resolve({ ok: false, sebep: 'depo' });
         if (!jetonVarMi() || !asilFetch) return Promise.resolve({ ok: false, sebep: 'oturum' });
@@ -1336,7 +1336,7 @@
         }
         if (d && d.type === 'JB_TEDARIK_SOR') {
             var tno = d.no;
-            tedarikListesi().then(function (sonuc) {
+            tedarikListesi(d.zorla === true).then(function (sonuc) {
                 gonder({ type: 'JB_TEDARIK', no: tno, sonuc: sonuc });
             });
             return;

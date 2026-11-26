@@ -9,9 +9,9 @@
  * geri verir. Yeni sekme açılmaz.
  *
  * NE GÖSTERİLİYOR
- *   - Donuktan pişen ürün: pişirme panelinin ACİL / KRİTİK / EKSİK dediği
- *     satırlar. "Stok eksik (5/6)" da gösteriliyor (kullanıcı: eksik varsa
- *     bildirim gelmeli); kritik alarm sesi yalnız ACİL ve KRİTİK'te çalar.
+ *   - Donuktan pişen ürün: pişirme panelinin ACİL / KRİTİK dediği satırlar.
+ *     "Stok eksik (5/6)" (PİŞİRME GEREKLİ) yalnız Asistan > Fırın'daki tik
+ *     açıksa (jbaFirinGerekli, varsayılan kapalı); alarm sesi onda çalmaz.
  *     Donukta stok yoksa gösterilmiyor (pişirilemez).
  *   - Taze üretim ekmek: rafta 10 ve altı kaldıysa.
  *
@@ -53,6 +53,8 @@
     var rafAlani = 'available';
     /* Ürün adı → erteleme bitişi (ms) */
     var ertele = {};
+    /* PİŞİRME GEREKLİ satırları da bildirilsin mi (Asistan > Fırın, varsayılan kapalı) */
+    var gerekliGoster = false;
 
     var IKON_SAAT = '<svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="7"/><path d="M10 6.5V10l2.5 1.5"/></svg>';
     var IKON_X = '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="m6 6 8 8M14 6l-8 8"/></svg>';
@@ -264,7 +266,7 @@
         var liste = JBA.firinHesap.oneriler(stoklu, JBA.firinHesap.ayarlar(), simdi)
             .filter(function (r) {
                 return !r.displayKind && r.amountToCook > 0 && r.frozenStock > 0 &&
-                    (r.alertLevel === 'danger' || r.alertLevel === 'urgent-prep' || r.alertLevel === 'warning');
+                    (r.alertLevel === 'danger' || r.alertLevel === 'urgent-prep' || (gerekliGoster && r.alertLevel === 'warning'));
             })
             .map(function (r) {
                 return Object.assign({
@@ -610,6 +612,15 @@
         });
     }
 
+    function gerekliOku() {
+        try {
+            chrome.storage.local.get('jbaFirinGerekli', function (r) {
+                void chrome.runtime.lastError;
+                gerekliGoster = !!(r && r.jbaFirinGerekli && r.jbaFirinGerekli.acik === true);
+            });
+        } catch (e) { /* yetim bağlam */ }
+    }
+
     function rafAlaniOku() {
         try {
             chrome.storage.local.get('jbaFirinRafAlani', function (r) {
@@ -651,12 +662,14 @@
         chrome.storage.onChanged.addListener(function (d, alan) {
             if (alan !== 'local') return;
             if (d.jbaFirinRafAlani) rafAlaniOku();
+            if (d.jbaFirinGerekli) gerekliOku();
             // Başka sekmede ertelendi ya da geri alındı
             if (d[ERTELE_ANAHTARI] && !son.sim) erteleOku(function () { ciz(son); });
         });
     } catch (e) { /* yetim bağlam */ }
 
     rafAlaniOku();
+    gerekliOku();
     erteleOku();
 
     // Deneme ve hata ayıklama için: (sonuc, sim, mod) → bildirim cevabı

@@ -10,8 +10,13 @@
  * ÇÖZÜM
  *   - Öneri listesinde görülen her La Lorraine ürünü (ad, dört dilimin
  *     önerisi, son görülme) saklanır: jbaFirinBilinen.
- *   - Depo panelinin tedarik listesi 15 dk'da bir panel sekmesine sorulur
- *     (sayfa-koprusu.js tedarikListesi): jbaFirinTedarik.
+ *   - Depo panelinin tedarik listesi 30 dk'da bir (07:00-24:00) ve gün sonu
+ *     çıkışından sonra 23:35'te kendiliğinden, açık bir depo paneli
+ *     sekmesine sorulur (sayfa-koprusu.js tedarikListesi): jbaFirinTedarik.
+ *     Panel açık değilse istek atılmaz.
+ *   - "Geldi" sayılan yalnız mal kabulü tamamlanmış teslimattaki alınan adet
+ *     (acceptedCount). Siparişte olup gelmeyen ürün (alınan 0) gelmiş sayılmaz.
+ *   - Asistan > Fırın > La Lorraine Takibi kapalıysa hiçbiri çalışmaz.
  *   - Bilinen ürün listede yoksa ve son görülmesinden SONRA kabul edilmiş
  *     bir teslimatta geldiyse donukta stok var demektir. Hiç görülmemiş La
  *     Lorraine ürünü son 3 günde geldiyse o da sayılır. Raf stoğu franchise
@@ -24,7 +29,11 @@
 
 const FT_BILINEN = 'jbaFirinBilinen';
 const FT_TEDARIK = 'jbaFirinTedarik';
-const FT_TEDARIK_MS = 15 * 60 * 1000;
+const FT_TEDARIK_MS = 30 * 60 * 1000;
+const FT_AYAR = 'jbaLaLorraine';
+const FT_DURUM = 'jbaLaLorraineDurum';
+const FT_ALARM = 'jba-lalorraine';
+const FT_ALARM_GECE = 'jba-lalorraine-gece';
 const FT_BILINEN_GUN = 21;
 const FT_YENI_GUN = 3;
 const FT_STOK_MS = 60 * 1000;
@@ -73,11 +82,17 @@ globalThis.jbaFirinBilinenYaz = async function (liste) {
     }
 };
 
+async function ftAcik() {
+    try { return ((await chrome.storage.local.get(FT_AYAR))[FT_AYAR] || {}).acik !== false; } catch (e) { return true; }
+}
+
 async function ftTedarikOku() {
     try { return (await chrome.storage.local.get(FT_TEDARIK))[FT_TEDARIK] || null; } catch (e) { return null; }
 }
 
-/** Tedarik listesi; bayatsa verilen ya da açık bir panel sekmesine sorulur */
+/** Tedarik listesi; bayatsa verilen ya da açık bir panel sekmesine sorulur.
+    zorla: sayfa köprüsünün 10 dk'lık önbelleği de atlanır. */
+let ftSonDeneme = { zaman: 0, ok: false, sebep: '' };
 async function ftTedarik(sekmeId, zorla) {
     const eski = await ftTedarikOku();
     if (!zorla && eski && Date.now() - eski.zaman < FT_TEDARIK_MS) return eski;
@@ -90,15 +105,20 @@ async function ftTedarik(sekmeId, zorla) {
                 if (t.status === 'complete' && !t.discarded && hedefler.indexOf(t.id) < 0) hedefler.push(t.id);
             });
         } catch (e) { /* sekme yok */ }
+        let sebep = hedefler.length ? 'Panel cevap vermedi; sekmeyi yenile.' : 'Depo paneli açık değil.';
         for (const id of hedefler.slice(0, 3)) {
             let c = null;
-            try { c = await chrome.tabs.sendMessage(id, { type: 'JBA_TEDARIK_SOR' }); } catch (e) { c = null; }
+            try { c = await chrome.tabs.sendMessage(id, { type: 'JBA_TEDARIK_SOR', zorla: !!zorla }); } catch (e) { c = null; }
             if (c && c.ok && Array.isArray(c.teslimatlar)) {
                 const kayit = { zaman: Date.now(), teslimatlar: c.teslimatlar };
                 chrome.storage.local.set({ [FT_TEDARIK]: kayit }).catch(() => {});
+                ftSonDeneme = { zaman: Date.now(), ok: true, sebep: '' };
                 return kayit;
             }
+            if (c && c.sebep === 'oturum') sebep = 'Panel oturumu bekleniyor.';
+            else if (c && c.sebep) sebep = 'Tedarik listesi okunamadı (' + c.sebep + ').';
         }
+        ftSonDeneme = { zaman: Date.now(), ok: false, sebep };
         return eski;
     })();
     try { return await ftTedarikSuruyor; } finally { ftTedarikSuruyor = null; }
@@ -161,7 +181,7 @@ async function ftListeDisi(mevcut, sekmeId, bekle) {
     else {
         // Bildirim beklemesin: eldeki liste kullanılır, bayatsa arkada tazelenir
         t = await ftTedarikOku();
-        if (!t || Date.now() - t.zaman >= FT_TEDARIK_MS) ftTedarik(sekmeId, false).catch(() => {});
+        if (!t || Date.now() - t.zaman >= FT_TEDARIK_MS) ftTedarik(sekmeId, false).then(ftDurumYaz).catch(() => {});
     }
     if (!t || !Array.isArray(t.teslimatlar)) return [];
     const simdi = Date.now();
@@ -215,9 +235,14 @@ async function ftListeDisi(mevcut, sekmeId, bekle) {
 /** firin-nobet.js: bildirim listesine listeden düşen La Lorraine ürünlerini ekler */
 globalThis.jbaFirinListeDisi = async function (cevap, sekmeId) {
     if (!cevap || !cevap.ok) return cevap;
+    if (!(await ftAcik())) return cevap;
     try {
         if (cevap.laLorraine) await globalThis.jbaFirinBilinenYaz(cevap.laLorraine);
-        const ek = await ftListeDisi(cevap.adlar || [], sekmeId, false);
+        let ek = await ftListeDisi(cevap.adlar || [], sekmeId, false);
+        // PİŞİRME GEREKLİ (rafta var ama hedefin altında) yalnız tik açıksa bildirilir
+        let gerekli = false;
+        try { gerekli = ((await chrome.storage.local.get('jbaFirinGerekli')).jbaFirinGerekli || {}).acik === true; } catch (e) { gerekli = false; }
+        if (!gerekli) ek = ek.filter((u) => u.seviye !== 'warning');
         if (!ek.length) return cevap;
         const listede = new Set((cevap.liste || []).map((u) => ftSade(u.ad)));
         const yeni = ek.filter((u) => !listede.has(ftSade(u.ad)));
@@ -233,24 +258,98 @@ globalThis.jbaFirinListeDisi = async function (cevap, sekmeId) {
     return cevap;
 };
 
-/** Önümüzdeki 7 günün (bugün dahil) gelmemiş La Lorraine teslimatları */
+/**
+ * La Lorraine teslimatları: önümüzdeki 7 günün planlıları (sipariş adedi) ve
+ * son 36 saatte mal kabulü bitenler (alınan / sipariş; alınan 0 = gelmedi).
+ */
 function ftPlan(t) {
     if (!t || !Array.isArray(t.teslimatlar)) return [];
     const bugun = new Date(); bugun.setHours(0, 0, 0, 0);
     const son = bugun.getTime() + 8 * 864e5;
+    const yakin = Date.now() - 36 * 3600 * 1000;
+    const bitti = (x) => /^(COMPLETED|CLOSED)$/.test(x.durum || '') && !!x.kabul;
     return t.teslimatlar
-        .filter((x) => x && x.beklenen && x.beklenen >= bugun.getTime() && x.beklenen < son && !/^(COMPLETED|CLOSED)$/.test(x.durum || ''))
-        .sort((a, b) => a.beklenen - b.beklenen)
+        .filter((x) => x && (bitti(x) ? x.kabul >= yakin : (x.beklenen && x.beklenen >= bugun.getTime() && x.beklenen < son)))
         .map((x) => ({
+            durum: bitti(x) ? 'geldi' : 'planli',
             beklenen: x.beklenen,
-            urunler: (x.urunler || []).filter((u) => ftLaLorraine(u.ad)).map((u) => ({ ad: u.ad, siparis: u.siparis })),
+            kabul: bitti(x) ? x.kabul : null,
+            urunler: (x.urunler || []).filter((u) => ftLaLorraine(u.ad))
+                .map((u) => ({ ad: u.ad, siparis: u.siparis, alinan: bitti(x) ? u.alinan : null })),
         }))
-        .filter((x) => x.urunler.length);
+        .filter((x) => x.urunler.length)
+        .sort((a, b) => (a.kabul || a.beklenen || 0) - (b.kabul || b.beklenen || 0));
 }
 
+/** Asistan penceresindeki durum satırı */
+function ftDurumYaz(t) {
+    const plan = ftPlan(t);
+    const parca = [];
+    const geldi = plan.filter((x) => x.durum === 'geldi');
+    if (geldi.length) {
+        const u = geldi.flatMap((x) => x.urunler);
+        const gelmeyen = u.filter((x) => !(x.alinan > 0)).length;
+        parca.push('Son gelen: ' + (u.length - gelmeyen) + ' ürün' + (gelmeyen ? ', ' + gelmeyen + ' ürün gelmedi' : ''));
+    }
+    const planli = plan.filter((x) => x.durum === 'planli');
+    if (planli.length) {
+        const ilk = planli[0];
+        const d = new Date(ilk.beklenen); d.setHours(0, 0, 0, 0);
+        const b = new Date(); b.setHours(0, 0, 0, 0);
+        const fark = Math.round((d - b) / 864e5);
+        const gun = fark <= 0 ? 'Bugün' : fark === 1 ? 'Yarın' : new Date(ilk.beklenen).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' });
+        parca.push(gun + ' ' + ilk.urunler.length + ' ürün planlı');
+    } else parca.push('7 gün içinde planlı teslimat yok');
+    const metin = ftSonDeneme.ok || !ftSonDeneme.zaman ? parca.join(' · ') : ftSonDeneme.sebep + (t ? ' Son liste: ' + parca.join(' · ') : '');
+    chrome.storage.local.set({ [FT_DURUM]: { zaman: ftSonDeneme.ok ? (t && t.zaman) : ftSonDeneme.zaman, ok: ftSonDeneme.ok, metin } }).catch(() => {});
+}
+
+/** 30 dk'da bir ve 23:35: panel açıksa tedarik listesi tazelenir */
+async function ftOtomatik(gece) {
+    if (!(await ftAcik())) return;
+    const saat = new Date().getHours();
+    if (!gece && saat < 7) return;
+    const t = await ftTedarik(null, true);
+    ftDurumYaz(t);
+}
+
+async function ftAlarmKur() {
+    // Var olan alarm yeniden kurulmaz: hizmet işçisi her uyandığında sayaç sıfırlanmasın
+    const var30 = await chrome.alarms.get(FT_ALARM).catch(() => null);
+    if (!var30) chrome.alarms.create(FT_ALARM, { delayInMinutes: 1, periodInMinutes: 30 });
+    const varGece = await chrome.alarms.get(FT_ALARM_GECE).catch(() => null);
+    if (!varGece) {
+        const d = new Date(); d.setHours(23, 35, 0, 0);
+        if (d.getTime() <= Date.now()) d.setDate(d.getDate() + 1);
+        chrome.alarms.create(FT_ALARM_GECE, { when: d.getTime(), periodInMinutes: 1440 });
+    }
+}
+
+chrome.alarms.onAlarm.addListener((a) => {
+    if (a.name === FT_ALARM) ftOtomatik(false).catch(() => {});
+    else if (a.name === FT_ALARM_GECE) ftOtomatik(true).catch(() => {});
+});
+chrome.runtime.onStartup.addListener(() => { ftAlarmKur().catch(() => {}); });
+// Takip açılınca beklemeden bir kez bakılır
+chrome.storage.onChanged.addListener((d, alan) => {
+    if (alan === 'local' && d[FT_AYAR] && (d[FT_AYAR].newValue || {}).acik !== false) ftOtomatik(true).catch(() => {});
+});
+chrome.runtime.onInstalled.addListener(() => { ftAlarmKur().catch(() => {}); });
+ftAlarmKur().catch(() => {});
+
 chrome.runtime.onMessage.addListener((m, gonderen, cevapla) => {
+    if (m && m.type === 'JBA_LALORRAINE_SIMDI') {
+        (async () => {
+            if (!(await ftAcik())) { cevapla({ ok: false, metin: 'La Lorraine takibi kapalı.' }); return; }
+            const t = await ftTedarik(null, true);
+            ftDurumYaz(t);
+            cevapla({ ok: ftSonDeneme.ok, metin: ftSonDeneme.sebep });
+        })().catch(() => cevapla({ ok: false, metin: 'Kontrol edilemedi.' }));
+        return true;
+    }
     if (!m || m.type !== 'JBA_FIRIN_LALORRAINE') return false;
     (async () => {
+        if (!(await ftAcik())) { cevapla({ ok: false, kapali: true, plan: [], eksik: [] }); return; }
         const sekme = gonderen && gonderen.tab ? gonderen.tab.id : null;
         if (Array.isArray(m.bilinen) && m.bilinen.length) await globalThis.jbaFirinBilinenYaz(m.bilinen);
         const t = await ftTedarik(sekme, !!m.tazele);

@@ -437,7 +437,7 @@
 
     /* Sayfa köprüsüne tedarik listesini sor (sayfa-koprusu.js tedarikListesi) */
     var tedarikNo = 0;
-    function tedarikSor() {
+    function tedarikSor(zorla) {
       return new Promise(function (coz) {
         var no = 't' + Date.now() + '-' + (++tedarikNo);
         var bitti = false;
@@ -455,7 +455,7 @@
         }
         global.addEventListener('message', dinle);
         setTimeout(function () { bitir({ ok: false, sebep: 'zaman aşımı' }); }, 30000);
-        global.postMessage({ type: 'JB_TEDARIK_SOR', no: no }, global.location.origin);
+        global.postMessage({ type: 'JB_TEDARIK_SOR', no: no, zorla: zorla === true }, global.location.origin);
       });
     }
 
@@ -463,7 +463,7 @@
     try {
       chrome.runtime.onMessage.addListener(function (m, gonderen, cevapla) {
         if (!m || m.type !== 'JBA_TEDARIK_SOR') return false;
-        tedarikSor().then(cevapla);
+        tedarikSor(m.zorla === true).then(cevapla);
         return true;
       });
     } catch (e) { /* yetim bağlam */ }
