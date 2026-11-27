@@ -786,6 +786,46 @@
     // Tamamlanmış teslimatın detayı değişmediği için bir kez sorulur.
     // ==================================================================
 
+    // ==================================================================
+    // Mal Kabul Talepleri: Jet Barkod kataloğunda olmayan ürünün adı, barkodu
+    // ve görseli. Transfer Teslimat detayında "Ürünler" açılınca panel aynı
+    // isteği aynı gövdeyle atıyor: POST /products/filter-by-id.
+    // ==================================================================
+
+    function urunBilgisi(idler) {
+        var l = (Array.isArray(idler) ? idler : []).map(function (i) { return String(i).toLowerCase(); })
+            .filter(function (i, n, a) { return /^[a-f0-9]{24}$/.test(i) && a.indexOf(i) === n; }).slice(0, 100);
+        if (!l.length) return Promise.resolve({ ok: true, urunler: [] });
+        if (!jetonVarMi() || !asilFetch) return Promise.resolve({ ok: false, sebep: 'oturum' });
+        var b2 = { 'content-type': 'application/json' };
+        Object.keys(panelBasliklari).forEach(function (k) { b2[k] = panelBasliklari[k]; });
+        var govde = { fields: '_id barcodes picURL fullName', includeDefaultFields: false, productIds: l };
+        return asilFetch(TEMEL + '/products/filter-by-id', { method: 'POST', headers: b2, body: JSON.stringify(govde), credentials: 'include' })
+            .then(function (r) {
+                if (!r.ok) return { ok: false, sebep: 'http ' + r.status };
+                return r.json().then(function (j) {
+                    var hepsi = (j && j.data && Array.isArray(j.data.products)) ? j.data.products : [];
+                    return {
+                        ok: true,
+                        urunler: hepsi.map(function (u) {
+                            var b = (Array.isArray(u && u.barcodes) ? u.barcodes : []).map(String);
+                            // Önce 13 haneli (EAN-13) barkod; iç kodlar (8 hane) sonra
+                            var ean = b.filter(function (x) { return /^\d{13}$/.test(x); })[0];
+                            var ad = u && u.fullName ? (u.fullName.tr || u.fullName.en || '') : '';
+                            var gorsel = u && u.picURL ? (u.picURL.tr || u.picURL.en || '') : '';
+                            return {
+                                id: String((u && (u.id || u._id)) || '').toLowerCase(),
+                                ad: String(ad).slice(0, 200),
+                                barkod: String(ean || b[0] || '').slice(0, 40),
+                                gorsel: /^https:\/\//.test(gorsel) ? String(gorsel).slice(0, 400) : ''
+                            };
+                        }).filter(function (u) { return /^[a-f0-9]{24}$/.test(u.id); })
+                    };
+                });
+            })
+            .catch(function () { return { ok: false, sebep: 'ağ' }; });
+    }
+
     var TEDARIK_ARA_MS = 10 * 60 * 1000;
     var tedarikSon = null;
     var tedarikZaman = 0;
@@ -1335,6 +1375,13 @@
             var kno = d.no;
             kaldirmaListesi(d.gun).then(function (sonuc) {
                 gonder({ type: 'JB_KALDIRMA_LISTE', no: kno, sonuc: sonuc });
+            });
+            return;
+        }
+        if (d && d.type === 'JB_URUN_BILGI_SOR') {
+            var uno = d.no;
+            urunBilgisi(d.idler).then(function (sonuc) {
+                gonder({ type: 'JB_URUN_BILGI', no: uno, sonuc: sonuc });
             });
             return;
         }

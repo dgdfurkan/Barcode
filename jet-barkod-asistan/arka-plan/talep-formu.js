@@ -11,7 +11,7 @@
  *
  * GÖNDER'e ASLA basılmaz. Kullanıcı formu görür, isterse düzeltir, kendisi
  * gönderir. Getir'e istek atılmaz; yalnız sekme açılır ve form alanlarına
- * yazılır.
+ * yazılır. Katalogda olmayan ürünün adı açık depo paneli sekmesine sorulur.
  * ============================================================================
  */
 
@@ -198,6 +198,37 @@ async function talepAc(m, gonderen) {
     talepBekleyen.set(sekme.id, taslak);
     return { ok: true, metin: 'Talep formu açıldı, dolduruluyor.' };
 }
+
+/*
+ * Katalogda olmayan ürünlerin adı ve barkodu: açık depo paneli sekmesine
+ * sorulur (moduller/depo-jeton.js → sayfa köprüsü → POST /products/filter-by-id,
+ * panelin Transfer Teslimat detayında attığı istek). Sekme yoksa sayfa elle
+ * girdi ister.
+ */
+async function urunBilgisi(m) {
+    const idler = (Array.isArray(m && m.idler) ? m.idler : []).map(String).filter((i) => /^[a-f0-9]{24}$/i.test(i)).slice(0, 100);
+    if (!idler.length) return { ok: true, urunler: [] };
+    let sekmeler = [];
+    try {
+        sekmeler = (await chrome.tabs.query({ url: 'https://warehouse.getir.com/*' }))
+            .filter((t) => t.status === 'complete' && !t.discarded);
+    } catch (e) { sekmeler = []; }
+    if (!sekmeler.length) return { ok: false, sebep: 'Depo paneli bu bilgisayarda açık değil.' };
+    let sebep = 'Depo paneli cevap vermedi; panel sekmesini yenile.';
+    for (const t of sekmeler.slice(0, 3)) {
+        let c = null;
+        try { c = await chrome.tabs.sendMessage(t.id, { type: 'JBA_URUN_BILGI_SOR', idler }); } catch (e) { c = null; }
+        if (c && c.ok && Array.isArray(c.urunler)) return { ok: true, urunler: c.urunler.slice(0, 100) };
+        if (c && c.sebep === 'oturum') sebep = 'Depo paneli oturumu bekleniyor; panelde bir sayfa aç.';
+    }
+    return { ok: false, sebep };
+}
+
+chrome.runtime.onMessage.addListener((istek, gonderen, cevapla) => {
+    if (!istek || istek.type !== 'JBA_URUN_BILGI') return false;
+    urunBilgisi(istek).then(cevapla, () => cevapla({ ok: false, sebep: 'Ürün bilgisi okunamadı.' }));
+    return true;
+});
 
 chrome.runtime.onMessage.addListener((istek, gonderen, cevapla) => {
     if (!istek || istek.type !== 'JBA_TALEP_DOLDUR') return false;

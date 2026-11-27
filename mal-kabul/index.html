@@ -20,7 +20,7 @@
     <link rel="stylesheet" href="../css/motion.css?v=20260907a" />
     <link rel="stylesheet" href="../css/siparisler.css?v=20261031a" />
     <link rel="stylesheet" href="../css/yardimcilar.css?v=20261110a" />
-    <link rel="stylesheet" href="../css/mal-kabul.css?v=20261127a" />
+    <link rel="stylesheet" href="../css/mal-kabul.css?v=20261127b" />
     <script src="../js/auth-token.js?v=20261007a"></script>
     <script src="../js/db-config.js?v=20260828i"></script>
     <script src="../js/jb-db.js?v=20261014a"></script>
@@ -91,6 +91,11 @@
                 </div>
                 <label class="mk-girdi"><span>Telefon Numarası</span><input type="tel" id="mkTelefon" inputmode="tel" autocomplete="tel" placeholder="05xx xxx xx xx" maxlength="20"></label>
                 <label class="mk-girdi"><span>Araç Plakası <small>(hasar talebinde)</small></span><input type="text" id="mkPlaka" autocomplete="off" placeholder="06 ABC 123" maxlength="20"></label>
+                <label class="mk-kap">
+                    <input type="checkbox" id="mkKap">
+                    <span class="mk-kap__kutu" aria-hidden="true"><svg viewBox="0 0 20 20"><path d="m5 10.5 3 3 7-7"/></svg></span>
+                    <span class="mk-kap__metin"><strong>Palet ve kasaları dahil et</strong><small id="mkKapSayi"></small></span>
+                </label>
                 <div class="mk-girdi">
                     <span id="mkDomainEtiket">Domain</span>
                     <div class="mk-segment" id="mkDomain" role="radiogroup" aria-labelledby="mkDomainEtiket">
@@ -104,6 +109,6 @@
         </div>
     </main>
 
-    <script src="../js/mal-kabul.js?v=20261127a"></script>
+    <script src="../js/mal-kabul.js?v=20261127b"></script>
 </body>
 </html>

@@ -168,6 +168,21 @@
             });
             return;
         }
+        if (d.type === 'JB_URUN_BILGI_ISTE' && Array.isArray(d.idler)) {
+            var uno = String(d.no || '').slice(0, 40);
+            arkaPlana({ type: 'JBA_URUN_BILGI', idler: d.idler.slice(0, 100) }, function (y) {
+                var l = y && Array.isArray(y.urunler) ? y.urunler.slice(0, 100).map(function (u) {
+                    return {
+                        id: String((u && u.id) || '').slice(0, 24),
+                        ad: String((u && u.ad) || '').slice(0, 200),
+                        barkod: String((u && u.barkod) || '').slice(0, 40),
+                        gorsel: /^https:\/\//.test(String((u && u.gorsel) || '')) ? String(u.gorsel).slice(0, 400) : ''
+                    };
+                }) : null;
+                gonder({ type: 'JB_URUN_BILGI_SONUC', no: uno, ok: !!(y && y.ok), urunler: l, sebep: String((y && y.sebep) || (y ? '' : 'Jet Barkod Asistan yanıt vermedi.')).slice(0, 200) });
+            });
+            return;
+        }
         if (d.type === 'JB_KALDIRMA_TAZELE') {
             arkaPlana({ type: 'JBA_KALDIRMA_TAZELE' }, function (y) {
                 gonder({

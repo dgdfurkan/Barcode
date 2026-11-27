@@ -61,6 +61,18 @@
 .mk-girdi input:focus, .mk-girdi textarea:focus { outline: none; border-color: var(--mavi); box-shadow: 0 0 0 3px var(--mavi-50); }
 .mk-girdi input[data-alan="transferId"], .mk-girdi input[data-alan="barkod"], .mk-girdi input[data-alan="palet"] { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
 
+/* Palet ve kasa tiki (form satırında) */
+.mk-kap { flex: 1 1 200px; min-height: 44px; display: inline-flex; align-items: center; gap: 12px; cursor: pointer; align-self: flex-end; }
+.mk-kap input { position: absolute; opacity: 0; width: 1px; height: 1px; pointer-events: none; }
+.mk-kap__kutu, .mk-tik span { flex: none; width: 24px; height: 24px; display: grid; place-items: center; border: 1.5px solid var(--cizgi-sert); border-radius: 6px; background: var(--yuzey); color: transparent;
+    transition: background-color var(--motion-fast) var(--motion-ease-standard), border-color var(--motion-fast) var(--motion-ease-standard), color var(--motion-fast) var(--motion-ease-standard); }
+.mk-kap__kutu svg, .mk-tik span svg { width: 16px; height: 16px; stroke-width: 2.4; }
+.mk-kap input:checked + .mk-kap__kutu, .mk-tik input:checked + span { background: var(--mavi); border-color: var(--mavi); color: #fff; }
+.mk-kap input:focus-visible + .mk-kap__kutu, .mk-tik input:focus-visible + span { outline: 2px solid var(--mavi); outline-offset: 2px; }
+.mk-kap__metin { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.mk-kap__metin strong { font-size: 13px; line-height: 18px; color: var(--yazi); }
+.mk-kap__metin small { min-height: 16px; font-size: 11px; line-height: 16px; color: var(--sonuk); }
+
 /* Gövde */
 .mk-govde { margin-top: 24px; display: flex; flex-direction: column; gap: 16px; padding-bottom: 48px; }
 
@@ -79,9 +91,26 @@
 .mk-rozet--tdisi { background: var(--mavi-50); color: var(--mavi-koyu); }
 .mk-rozet--hasar { background: var(--kirmizi-50); color: var(--kirmizi); }
 
-/* Ürün satırı */
+/* Ürün satırı: dahil tiki · görsel · bilgi · adetler */
 .mk-urunler { display: flex; flex-direction: column; }
-.mk-urun { display: flex; align-items: flex-start; gap: 12px; padding: 12px 16px; border-top: 1px solid var(--cizgi); }
+.mk-urun { display: flex; align-items: flex-start; gap: 12px; padding: 12px 16px; border-top: 1px solid var(--cizgi);
+    transition: background-color var(--motion-fast) var(--motion-ease-standard); }
+.mk-tik { position: relative; flex: none; width: 24px; height: 56px; display: grid; place-items: center; cursor: pointer; }
+.mk-tik::after { content: ''; position: absolute; inset: 0 -10px; }
+.mk-tik input { position: absolute; opacity: 0; width: 1px; height: 1px; pointer-events: none; }
+.mk-urun.is-haric { background: var(--kagit); }
+.mk-urun.is-haric .mk-gorsel, .mk-urun.is-haric .mk-cipler, .mk-urun.is-haric .mk-sayilar, .mk-urun.is-haric .mk-barkod, .mk-urun.is-haric .mk-koli { opacity: 0.45; }
+.mk-urun.is-haric .mk-urun__ad { color: var(--sonuk); }
+.mk-urun__haric { margin-left: 8px; height: 20px; padding: 0 8px; display: inline-flex; align-items: center; vertical-align: 1px; border-radius: 6px; background: var(--cizgi);
+    font-style: normal; font-size: 11px; font-weight: 700; color: var(--yazi-orta); }
+
+/* Katalogda olmayan ürün: elle ad ve barkod */
+.mk-elle { width: 100%; padding: 12px; display: flex; flex-direction: column; gap: 8px; border: 1px solid var(--sari-cizgi); border-radius: 12px; background: var(--sari-50); }
+.mk-elle__not { margin: 0; display: flex; align-items: flex-start; gap: 8px; font-size: 12px; line-height: 16px; color: #b45309; font-weight: 600; }
+.mk-elle__not svg { flex: none; width: 16px; height: 16px; }
+.mk-elle__alanlar { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: 8px; }
+.mk-elle__alanlar .mk-girdi:only-child { grid-column: 1 / -1; }
+.mk-elle input[data-elle="elleBarkod"] { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
 .mk-urun:first-child { border-top: 0; }
 .mk-gorsel { flex: none; width: 56px; height: 56px; border-radius: 12px; border: 1px solid var(--cizgi); background: var(--yuzey); padding: 4px; display: grid; place-items: center; overflow: hidden; color: var(--soluk); }
 .mk-gorsel img { width: 100%; height: 100%; object-fit: contain; }
@@ -134,6 +163,9 @@
 .mk-taslak__tur--hasar { background: var(--kirmizi-50); color: var(--kirmizi); }
 .mk-taslak__tur--irsaliye { background: var(--sari-50); color: #b45309; }
 .mk-taslak__tur--tdisi { background: var(--mavi-50); color: var(--mavi-koyu); }
+.mk-taslak__eksik { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; line-height: 16px; font-weight: 700; color: #b45309; }
+.mk-taslak__eksik[hidden] { display: none; }
+.mk-taslak__eksik svg { width: 14px; height: 14px; }
 .mk-taslak__hazir { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; line-height: 16px; font-weight: 700; color: var(--yesil-koyu); }
 .mk-taslak__hazir svg { width: 14px; height: 14px; }
 .mk-taslak__alt { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; font-size: 11px; font-weight: 600; color: var(--sonuk); }
@@ -141,6 +173,11 @@
 .mk-girdi--genis { grid-column: 1 / -1; }
 .mk-taslak__dugmeler { display: flex; gap: 8px; flex-wrap: wrap; }
 .mk-not { margin: 0; padding: 12px 16px; border-top: 1px solid var(--cizgi); font-size: 12px; line-height: 16px; color: var(--sonuk); }
+
+/* Panelden ad/barkod sorusu sonucu */
+.mk-uyari { padding: 12px 16px; display: flex; align-items: flex-start; gap: 8px; border: 1px solid var(--sari-cizgi); border-radius: 12px; background: var(--sari-50);
+    font-size: 12px; line-height: 16px; font-weight: 600; color: #b45309; }
+.mk-uyari svg { flex: none; width: 16px; height: 16px; }
 
 /* Katlanır kısa listeler */
 .mk-katlanir { border: 1px solid var(--cizgi); border-radius: 16px; background: var(--yuzey); overflow: hidden; }
@@ -182,9 +219,13 @@
     .mk-form .mk-girdi, .mk-form .mk-girdi:last-child { flex: 1 1 100%; }
     .mk-form .mk-segment { width: 100%; }
     .mk-form .mk-segment button { flex: 1; }
-    .mk-urun { flex-wrap: wrap; padding: 12px; }
-    .mk-urun__bilgi { flex: 1 1 calc(100% - 68px); }
-    .mk-sayilar { width: 100%; padding-left: 68px; }
+    .mk-kap { flex: 1 1 100%; }
+    .mk-urun { flex-wrap: wrap; gap: 8px; padding: 12px; }
+    .mk-gorsel { width: 48px; height: 48px; }
+    .mk-tik { height: 48px; }
+    .mk-urun__bilgi { flex: 1 1 calc(100% - 96px); }
+    .mk-sayilar { width: 100%; padding-left: 88px; }
+    .mk-elle__alanlar { grid-template-columns: minmax(0, 1fr); }
     .mk-sayi { flex: 1; }
     .mk-taslaklar { padding: 12px; }
     .mk-taslak { padding: 12px; }
