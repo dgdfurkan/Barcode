@@ -244,6 +244,8 @@ async function ftListeDisi(mevcut, sekmeId, bekle) {
         const r = s && typeof s.raf === 'number' ? s.raf : null;
         if (r !== null && r >= hedef) return;
         const pisir = Math.max(1, Math.min(g.alinan, hedef - (r || 0)));
+        const gun = (ms) => new Date(ms).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' });
+        const tahmin = bil ? 'Tahmini öneri ' + hedef + ' (son görülme ' + gun(bil.son) + ').' : 'Tahmini öneri ' + hedef + ' (önceki öneri bilinmiyor).';
         satirlar.push({
             ad: (bil && bil.ad) || g.ad,
             gorsel: (bil && bil.gorsel) || g.gorsel || '',
@@ -255,7 +257,7 @@ async function ftListeDisi(mevcut, sekmeId, bekle) {
             hafif: r !== null && r > 0,
             listeDisi: true,
             sebep: 'Pişirme önerisinde yok. ' + ftTarih(g.kabul) + ' mal kabulde ' + g.alinan + ' adet geldi, ' +
-                (r === null ? 'raf stoğu okunamadı.' : 'rafta ' + r + '.'),
+                (r === null ? 'raf stoğu okunamadı.' : 'rafta ' + r + '.') + ' ' + tahmin,
             oneriler: oneriler.slice(0, 4),
         });
     });

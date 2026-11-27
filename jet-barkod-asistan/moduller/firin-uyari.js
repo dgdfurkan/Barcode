@@ -424,7 +424,7 @@
             : '<span class="gorsel"></span>';
         var oneriler = Array.isArray(u.oneriler) ? u.oneriler : [];
         // Öneri / Pişirilen / Satılan tablosu, en sağda Toplam (pişirme paneliyle aynı)
-        var dilimHtml = JBA.firinHesap.dilimTablosuHtml({ recommendations: oneriler, pisenler: u.pisenler, satislar: u.satislar }, simdiki);
+        var dilimHtml = JBA.firinHesap.dilimTablosuHtml({ recommendations: oneriler, pisenler: u.pisenler, satislar: u.satislar, tahmini: !!u.listeDisi }, simdiki);
         // Panelde ekmek de "N Adet Pişirilecek"; eksik yoksa (hedef karşılanmış) kalan adet
         var miktar = u.cikar ? sayi(u.raf) + ' Adet Çıkarılacak'
             : u.eskiCikar > 0 ? sayi(u.eskiCikar) + ' Çıkar · ' + sayi(u.pisir) + ' Pişir'

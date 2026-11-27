@@ -395,7 +395,8 @@
     var DILIM_KISA = ['08–12', '12–16', '16–20', '20–24'];
     function dilimTablosuHtml(p, suan) {
       var O = p.recommendations || [];
-      var satirlar = [['Öneri', O]];
+      // Pişirme önerisinde olmayan ürün: Getir'in o günkü önerisi yok, son bilinen öneri tahmin
+      var satirlar = [[p.tahmini ? 'Tahmini' : 'Öneri', O]];
       if (Array.isArray(p.pisenler)) satirlar.push(['Pişirilen', p.pisenler]);
       if (Array.isArray(p.satislar)) satirlar.push(['Satılan', p.satislar]);
       var sayi = function (x) { return String(Math.max(0, Number(x) || 0)); };

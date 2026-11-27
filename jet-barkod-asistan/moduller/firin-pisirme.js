@@ -1225,7 +1225,7 @@
           <strong class="ba-shelf-elde">${Number(u.raf) || 0}</strong>
           <span class="jba-ll-etiket" title="Pişirme önerisinde yok; ${kacir(gun)} mal kabulde ${Number(u.alinan) || 0} adet geldi">Tedarikten geldi · ${kacir(gun)}</span>
         </div>
-        <div class="ba-shelf-dilim">${u.oneriler ? JBA.firinHesap.dilimTablosuHtml({ recommendations: u.oneriler }, suan) : ''}</div>`;
+        <div class="ba-shelf-dilim">${u.oneriler ? JBA.firinHesap.dilimTablosuHtml({ recommendations: u.oneriler, tahmini: true }, suan) : ''}</div>`;
                   return card;
                 }, u.ad);
               });
