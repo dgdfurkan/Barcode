@@ -42,6 +42,15 @@
                     ikon: '<path d="M4 5h16v11H9l-5 4z"/><path d="M8 9h8M8 12h5"/>'
                 },
                 {
+                    kimlik: 'malKabul',
+                    haklar: ['jetBarkodAsistan'],
+                    ad: 'Mal Kabul Talepleri',
+                    ozet: 'Transfer paletlerinde eksik, fazla, hasarlı ve transfer dışı gelen ürünler; talep yazısı hazır, formu Asistan doldurur.',
+                    adres: '../mal-kabul/',
+                    renk: 'sari',
+                    ikon: '<path d="M2.5 7h11v8h-11zM13.5 10h4l3 3v2h-7z"/><circle cx="7" cy="17.5" r="1.8"/><circle cx="17" cy="17.5" r="1.8"/>'
+                },
+                {
                     kimlik: 'sayimFark',
                     haklar: ['stokSayimi', 'jetBarkodAsistan'],
                     ad: 'Sayım Farkı',

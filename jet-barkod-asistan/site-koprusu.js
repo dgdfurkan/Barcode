@@ -156,6 +156,18 @@
             });
             return;
         }
+        /* Mal Kabul Talepleri "Talep Formunda Hazırla": Depo Talep Merkezi formu yan
+           sekmede açılır ve doldurulur; GÖNDER'e kullanıcı basar (arka-plan/talep-formu.js) */
+        if (d.type === 'JB_TALEP_DOLDUR' && d.taslak && typeof d.taslak === 'object') {
+            arkaPlana({ type: 'JBA_TALEP_DOLDUR', taslak: d.taslak }, function (y) {
+                gonder({
+                    type: 'JB_TALEP_DOLDUR_SONUC',
+                    ok: !!(y && y.ok),
+                    metin: String((y && y.metin) || (y ? '' : 'Jet Barkod Asistan yanıt vermedi.')).slice(0, 200)
+                });
+            });
+            return;
+        }
         if (d.type === 'JB_KALDIRMA_TAZELE') {
             arkaPlana({ type: 'JBA_KALDIRMA_TAZELE' }, function (y) {
                 gonder({

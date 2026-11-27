@@ -22,6 +22,10 @@
  *     hareket  POST /stock-movement-logs/filter (yalnız transfer ve satış açıklaması)
  *     paletler POST /warehouse/<depo>/inbound/transfer
  *     palet    GET  /warehouse/<depo>/inbound/transfer/<id>
+ *     malkabul paletler + tamamlanan her paletin detayı, tek çağrıda (Yardımcılar >
+ *              Mal Kabul Talepleri). veri: { gun: 'YYYY-AA-GG' } (İstanbul günü, son 8 gün).
+ *              Yalnız farklı gelen ürünler döner (sipariş, alınan, hasarlı), adı ve
+ *              barkodu Jet Barkod kataloğundan. Panelin kendi iki isteği; yeni uç yok.
  *   Cevaptan yalnız ürün kimliği, zaman, adet ve durum döner; kişi adı dönmez.
  *   Kullanıcı başına istekler arası en az 350 ms, dakikada 60.
  *   Jeton yok ya da süresi geçmişse 409 { error: 'oturum' }.
@@ -44,6 +48,51 @@ function jwtYuk(jeton) {
 const PANEL = 'https://warehouse-panel-api-gateway.getirapi.com';
 const ACIKLAMALAR = ['IncomingTransferAcceptance-IncreaseStock', 'PickingBasketDeliver'];
 const GUN_MS = 86400000;
+const { katalogAl } = require('./katalog');
+
+/* Mal kabul: transfer türleri (panelin "Tür" alanı) ve detayı okunacak durumlar */
+const TRANSFER_TUR = { 102: 'Taze Gıda', 103: 'Soğuk Gıda' };
+const KABUL_BITTI = ['COMPLETED', 'COMPLETE_PENDING', 'CLOSED'];
+
+/* 'YYYY-AA-GG' → İstanbul gününün başı ve sonu (panel de böyle soruyor) */
+function gunAraligi(gun) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(gun || ''))) return null;
+    const bas = Date.parse(gun + 'T00:00:00+03:00');
+    if (!Number.isFinite(bas) || bas > Date.now() + GUN_MS || Date.now() - bas > 8 * GUN_MS) return null;
+    return { bas, bit: bas + GUN_MS - 1 };
+}
+
+const sayi = (v) => (v == null || !Number.isFinite(Number(v)) ? null : Number(v));
+
+/* Panelin palet detayından yalnız farklı gelen ürünler */
+function malKabulPalet(d, kt) {
+    const goods = Array.isArray(d && d.goods) ? d.goods : [];
+    const log = Array.isArray(d && d.statusChangeLogs) ? d.statusChangeLogs : [];
+    const kabul = log.find((l) => l && /^COMPLETED/.test(String(l.status || '')));
+    const urunler = [];
+    goods.forEach((g) => {
+        const id = String((g && g.id) || '').toLowerCase();
+        if (!KIMLIK.test(id)) return;
+        const s = sayi(g.orderedCount) || 0;
+        const a = sayi(g.receivedCount);
+        const h = sayi(g.damagedCount) || 0;
+        if (a === null || (a === s && !h)) return;
+        const b = (kt && kt.bilgi && kt.bilgi.get(id)) || {};
+        urunler.push({
+            id, s, a, h,
+            ad: b.ad || '',
+            barkod: b.barkod || '',
+            gorsel: (kt && kt.id && kt.id.get(id)) || ''
+        });
+    });
+    return {
+        palet: String((d && d.palletBarcode) || '').slice(0, 60),
+        tur: TRANSFER_TUR[d && d.transferOrderType] || '',
+        kabul: (kabul && kabul.occurredAt) || null,
+        toplam: goods.length,
+        urunler: urunler.slice(0, 200)
+    };
+}
 
 function tarih(v) {
     const t = Date.parse(v);
@@ -200,6 +249,77 @@ function kur(app, { pool, verifyToken, bearerOf }) {
         return sonraki;
     }
 
+    async function panelSor(jeton, is) {
+        const ctrl = new AbortController();
+        const zaman = setTimeout(() => ctrl.abort(), 15000);
+        try {
+            return await fetch(PANEL + is.yol, {
+                method: is.yontem,
+                headers: {
+                    accept: 'application/json',
+                    authorization: jeton,
+                    'content-type': 'application/json',
+                    countrycode: 'TR',
+                    language: 'tr',
+                    'x-requester-client': 'warehouse-panel-frontend'
+                },
+                body: is.govde ? JSON.stringify(is.govde) : undefined,
+                signal: ctrl.signal
+            });
+        } finally {
+            clearTimeout(zaman);
+        }
+    }
+
+    /*
+     * Mal kabul: o günün teslimat listesi, sonra tamamlanan her paletin detayı.
+     * Hepsi tek sıra işinde; detaylar arası 150 ms (panel de her paleti tek
+     * tek soruyor). En çok 40 palet.
+     */
+    async function malKabul(req, res, kim, jeton, depo) {
+        const v = (req.body && req.body.veri) || {};
+        const ar = gunAraligi(v.gun);
+        if (!ar) return res.status(400).json({ ok: false, error: 'gecersiz' });
+        const sonuc = await sirala(kim, async () => {
+            const l = await panelSor(jeton, istekKur('paletler', { bas: new Date(ar.bas).toISOString(), bit: new Date(ar.bit).toISOString() }, depo));
+            if (l.status === 401 || l.status === 403) return { hata: 'oturum' };
+            if (!l.ok) return { hata: 'panel', durum: l.status };
+            const lj = await l.json().catch(() => null);
+            const teslim = (lj && lj.data && Array.isArray(lj.data.deliveries) ? lj.data.deliveries : []).slice(0, 40);
+            const kt = await katalogAl().catch(() => null);
+            const liste = [];
+            for (const t of teslim) {
+                const id = String((t && t.id) || '').toLowerCase();
+                if (!KIMLIK.test(id)) continue;
+                const p = {
+                    id,
+                    no: String((t && t.transferOrderNo) || '').slice(0, 60),
+                    durum: String((t && t.status) || ''),
+                    olusma: (t && t.createdAt) || null,
+                    sku: sayi(t && t.uniqueSKUCount),
+                    sevkiyat: String((t && t.shipmentCode) || '').slice(0, 40)
+                };
+                if (KABUL_BITTI.indexOf(p.durum) !== -1) {
+                    if (liste.length) await new Promise((c) => setTimeout(c, 150));
+                    try {
+                        const d = await panelSor(jeton, istekKur('palet', { id }, depo));
+                        if (d.status === 401 || d.status === 403) return { hata: 'oturum' };
+                        const dj = d.ok ? await d.json().catch(() => null) : null;
+                        if (dj && dj.data) Object.assign(p, malKabulPalet(dj.data, kt));
+                        else p.okunamadi = true;
+                    } catch (e) {
+                        p.okunamadi = true;
+                    }
+                }
+                liste.push(p);
+            }
+            return { liste };
+        });
+        if (sonuc.hata === 'oturum') return res.status(409).json({ ok: false, error: 'oturum' });
+        if (sonuc.hata) return res.status(502).json({ ok: false, error: 'panel', durum: sonuc.durum });
+        res.json({ ok: true, veri: { gun: v.gun, zaman: Date.now(), liste: sonuc.liste } });
+    }
+
     app.post('/api/depo-panel', async (req, res) => {
         const c = verifyToken(bearerOf(req));
         if (!c || !c.username || (c.role !== 'web_user' && c.role !== 'web_admin')) {
@@ -222,30 +342,12 @@ function kur(app, { pool, verifyToken, bearerOf }) {
             if (!b || typeof b.token !== 'string' || !KIMLIK.test(String(b.depo || '')) || (Number(b.bitis) || 0) < Date.now() + 15000) {
                 return res.status(409).json({ ok: false, error: 'oturum', son: b && Number(b.zaman) || null });
             }
-            const is = istekKur(islem, req.body && req.body.veri, String(b.depo).toLowerCase());
+            const depo = String(b.depo).toLowerCase();
+            if (islem === 'malkabul') return await malKabul(req, res, c.username, b.token, depo);
+            const is = istekKur(islem, req.body && req.body.veri, depo);
             if (!is) return res.status(400).json({ ok: false, error: 'gecersiz' });
 
-            const cevap = await sirala(c.username, async () => {
-                const ctrl = new AbortController();
-                const zaman = setTimeout(() => ctrl.abort(), 15000);
-                try {
-                    return await fetch(PANEL + is.yol, {
-                        method: is.yontem,
-                        headers: {
-                            accept: 'application/json',
-                            authorization: b.token,
-                            'content-type': 'application/json',
-                            countrycode: 'TR',
-                            language: 'tr',
-                            'x-requester-client': 'warehouse-panel-frontend'
-                        },
-                        body: is.govde ? JSON.stringify(is.govde) : undefined,
-                        signal: ctrl.signal
-                    });
-                } finally {
-                    clearTimeout(zaman);
-                }
-            });
+            const cevap = await sirala(c.username, () => panelSor(b.token, is));
             if (cevap.status === 401 || cevap.status === 403) return res.status(409).json({ ok: false, error: 'oturum' });
             if (!cevap.ok) return res.status(502).json({ ok: false, error: 'panel', durum: cevap.status });
             const j = await cevap.json().catch(() => null);

@@ -60,6 +60,7 @@ a.yrd-kart:active { transform: scale(0.99); }
 a.yrd-kart:focus-visible { outline: 2px solid var(--mavi); outline-offset: 2px; }
 .yrd-kart__ikon { flex: none; width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; background: var(--mavi-50); color: var(--mavi); }
 .yrd-kart__ikon--kirmizi { background: var(--kirmizi-50); color: var(--kirmizi); }
+.yrd-kart__ikon--sari { background: var(--sari-50); color: var(--sari); }
 .yrd-kart__ikon--mor { background: color-mix(in srgb, var(--mor) 10%, var(--yuzey)); color: var(--mor); }
 .yrd-kart__ikon svg { width: 22px; height: 22px; }
 .yrd-kart__metin { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }

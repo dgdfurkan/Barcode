@@ -24,11 +24,15 @@ async function yukle() {
         const liste = Array.isArray(j && j.products) ? j.products : [];
         const id = new Map();
         const ad = new Map();
-        const bilgi = new Map();   // kimlik → { barkod, kategori } (Sayım Farkı kartı)
+        const bilgi = new Map();   // kimlik → { barkod, kategori, ad } (Sayım Farkı kartı, Mal Kabul)
         liste.forEach((u) => {
             if (u && KIMLIK.test(String(u.id || ''))) {
                 const b = Array.isArray(u.barcodes) && u.barcodes[0] && u.barcodes[0].code;
-                bilgi.set(String(u.id), { barkod: b ? String(b).slice(0, 40) : '', kategori: String(u.category || '').slice(0, 80) });
+                bilgi.set(String(u.id), {
+                    barkod: b ? String(b).slice(0, 40) : '',
+                    kategori: String(u.category || '').slice(0, 80),
+                    ad: String(u.name || '').slice(0, 200)   // Mal Kabul Talepleri
+                });
             }
             if (!u || typeof u.image !== 'string' || !/^https:\/\//.test(u.image)) return;
             if (KIMLIK.test(String(u.id || ''))) id.set(String(u.id), u.image);
