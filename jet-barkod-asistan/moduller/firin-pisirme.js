@@ -77,6 +77,9 @@
         '.jba-ll-urun > b.is-tam { color: #047857; }',
         '.jba-ll-urun > b.is-eksik { color: #b54708; }',
         '.jba-ll-urun > b.is-gelmedi { color: #b42318; }',
+        '.jba-ll-etiket { display: inline-block; margin: 0; padding: 2px 8px; border-radius: 999px; background: #eef2ff; color: #4338ca;',
+        '  font-size: 10px; font-weight: 700; line-height: 14px; white-space: nowrap; }',
+        '.jba-ll-stok > .ba-shelf-dilim:empty { display: none !important; }',
         '@media (prefers-reduced-motion: reduce) { .jba-ll-tes__ic, .jba-ll-ok, .jba-ll-tes__ac { animation: none; transition: none; } }'
     ].join('\n');
 
@@ -1175,6 +1178,58 @@
             const view = buildViewModel(cachedProducts, settingsState);
             displayView(view);
             if (view.mode === 'cook') laLorraineCiz();
+            else laLorraineStokCiz();
+          }
+
+          /* Eldeki stok özeti: rafta olup pişirme önerisinde olmayan La Lorraine
+             ürünleri (tedarikten gelip pişirilmiş) sayfanın listesinde yok, o
+             yüzden burada da çıkmıyordu. Aynı kart, barkod katalogdan ya da
+             teslimat kaydından, küçük "Tedarikten geldi" etiketiyle. */
+          function llBarkodHtml(u) {
+            const bc = shelfBarcodeCornerInner(u.ad);
+            if (bc.barcode) return bc.barcode;
+            const kod = String(u.barkod || '');
+            if (!/^[0-9A-Za-z]{4,20}$/.test(kod)) return '';
+            if (/^\d{13}$/.test(kod)) {
+              const canon = ean13CanonicalForDrawing(kod);
+              const svg = canon && svgEan13BarCode(canon, true);
+              if (svg) return '<span style="display:block;line-height:0;" title="' + canon + '">' + svg + '</span>';
+            }
+            const svg128 = svgCode128BarCode(kod, true);
+            return svg128 ? '<span style="display:block;line-height:0;" title="' + kod + '">' + svg128 + '</span>' : '';
+          }
+          function laLorraineStokCiz() {
+            llIste((c) => {
+              if (!resultsContainer.isConnected) return;
+              resultsContainer.querySelectorAll('.jba-ll-stok').forEach((e) => e.remove());
+              if (c.kapali || !(c.stokta || []).length) return;
+              // Sayfanın listesi boşsa "Liste boş" kartı kalkar, yerine bunlar gelir
+              Array.prototype.slice.call(resultsContainer.children).forEach((e) => {
+                if (!e.classList.contains('baking-card') && /Liste boş/.test(e.textContent || '')) e.remove();
+              });
+              const suan = getCurrentTimeSlot(new Date().getHours()).index;
+              c.stokta.forEach((u) => {
+                guvenliEkle(resultsContainer, () => {
+                  const bc = llBarkodHtml(u);
+                  const gorsel = /^https:\/\//.test(u.gorsel || '') ? u.gorsel : '';
+                  const gun = new Date(u.kabul).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' });
+                  const card = document.createElement('div');
+                  card.className = 'baking-card baking-card-shelf fade-in jba-ll-stok';
+                  card.style.borderColor = '#64748b';
+                  card.style.backgroundColor = '#fff';
+                  card.innerHTML = `
+        ${gorsel ? `<img class="ba-shelf-img" src="${kacir(gorsel)}" alt="" width="52" height="52" style="width:52px;height:52px;object-fit:cover;border-radius:0.3rem;flex-shrink:0;">` : '<span class="ba-shelf-img" style="width:52px;height:52px;border-radius:0.3rem;background:#f4f6f9;flex-shrink:0;"></span>'}
+        <h4 class="ba-shelf-title" title="${kacir(u.ad)}">${kacir(u.ad)}</h4>
+        <div class="ba-shelf-bc">${bc ? `<div class="ba-corner-barcode">${bc}</div>` : ''}</div>
+        <div class="ba-shelf-stock">
+          <strong class="ba-shelf-elde">${Number(u.raf) || 0}</strong>
+          <span class="jba-ll-etiket" title="Pişirme önerisinde yok; ${kacir(gun)} mal kabulde ${Number(u.alinan) || 0} adet geldi">Tedarikten geldi · ${kacir(gun)}</span>
+        </div>
+        <div class="ba-shelf-dilim">${u.oneriler ? JBA.firinHesap.dilimTablosuHtml({ recommendations: u.oneriler }, suan) : ''}</div>`;
+                  return card;
+                }, u.ad);
+              });
+            });
           }
 
           /* La Lorraine: pişirme önerisinden düşmüş ama donuğu gelmiş ürünler ve

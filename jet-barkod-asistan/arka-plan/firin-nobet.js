@@ -178,9 +178,12 @@ async function kontrol(sebep) {
             durumYaz(sebepMetni(cevap));
             return;
         }
-        // Pişirme önerisinden düşmüş ama donuğu gelmiş La Lorraine ürünleri (firin-tedarik.js)
+        // Pişirme önerisinden düşmüş ama donuğu gelmiş La Lorraine ürünleri (firin-tedarik.js);
+        // gün sonunda da rafta kalan öneri dışı La Lorraine ürünleri çıkış listesine
         if (!gunSonu && typeof globalThis.jbaFirinListeDisi === 'function') {
             await globalThis.jbaFirinListeDisi(cevap, hedef.id);
+        } else if (gunSonu && typeof globalThis.jbaFirinCikarEk === 'function') {
+            await globalThis.jbaFirinCikarEk(cevap);
         }
         await yay(await panolar(), cevap);
         // Fırın sesi: ürün adları, kritik satış ve gün sonu durumu (firin-ses.js)

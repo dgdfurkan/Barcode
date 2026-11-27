@@ -262,6 +262,65 @@ async function ftListeDisi(mevcut, sekmeId, bekle) {
     return satirlar;
 }
 
+/**
+ * Rafta olup pişirme önerisinde (dolayısıyla eldeki stok özetinde ve 23:30
+ * çıkış listesinde) görünmeyen La Lorraine ürünleri: son 14 günde mal kabulle
+ * gelmiş, aktif (status 1), franchise raf stoğu 0'dan büyük. Aynı adlı inaktif
+ * ürün kimlikle elenir. Barkod teslimat kaydından.
+ */
+async function ftStoktakiler(mevcut) {
+    const varOlan = new Set((mevcut || []).map(ftSade));
+    const t = await ftTedarikOku();
+    if (!t || !Array.isArray(t.teslimatlar)) return [];
+    const sinir = Date.now() - 14 * 864e5;
+    const kalem = {};
+    t.teslimatlar.forEach((x) => {
+        if (!x || !x.kabul || x.kabul < sinir || !/^(COMPLETED|CLOSED)$/.test(x.durum || '')) return;
+        (x.urunler || []).forEach((u) => {
+            if (!ftLaLorraine(u.ad) || !(u.alinan > 0) || !FT_KIMLIK.test(u.id || '') || varOlan.has(ftSade(u.ad))) return;
+            if (!kalem[u.id] || kalem[u.id].kabul < x.kabul) kalem[u.id] = Object.assign({}, u, { kabul: x.kabul });
+        });
+    });
+    const idler = Object.keys(kalem);
+    if (!idler.length) return [];
+    const stok = await ftRafStoklari(idler);
+    if (!stok.ok) return [];
+    const b = await ftBilinenOku();
+    const ada = {};
+    idler.forEach((id) => {
+        const s = stok.degerler[id];
+        if (!s || !s.aktif || !(s.raf > 0)) return;
+        const u = kalem[id];
+        const k = ftSade(u.ad);
+        if (ada[k] && ada[k].kabul >= u.kabul) return;
+        ada[k] = {
+            ad: u.ad, gorsel: u.gorsel || (b[k] && b[k].gorsel) || '', raf: s.raf,
+            barkod: (u.barkodlar || [])[0] || '', kabul: u.kabul, alinan: u.alinan,
+            oneriler: b[k] && Array.isArray(b[k].oneriler) ? b[k].oneriler.slice(0, 4) : null,
+        };
+    });
+    return Object.values(ada).sort((x, y) => y.raf - x.raf);
+}
+
+/** firin-nobet.js 23:30-23:59: rafta kalan, öneri listesinde olmayan La Lorraine ürünleri de çıkarılsın */
+globalThis.jbaFirinCikarEk = async function (cevap) {
+    if (!cevap || !cevap.ok || !(await ftAcik())) return cevap;
+    try {
+        const ek = await ftStoktakiler(cevap.adlar || []);
+        if (!ek.length) return cevap;
+        const listede = new Set((cevap.liste || []).map((u) => ftSade(u.ad)));
+        const yeni = ek.filter((u) => !listede.has(ftSade(u.ad))).map((u) => ({
+            ad: u.ad, gorsel: u.gorsel, raf: u.raf, donuk: null, oneri: 0, pisir: u.raf, seviye: 'cikar', cikar: true,
+            sebep: 'Gün sonu: rafta ' + u.raf + ' adet var. Tedarikten geldi, pişirme önerisinde yok.',
+            oneriler: u.oneriler || [0, 0, 0, 0],
+        }));
+        if (!yeni.length) return cevap;
+        cevap.liste = (cevap.liste || []).concat(yeni).sort((x, y) => (y.raf || 0) - (x.raf || 0));
+        if (typeof cevap.gorunenSayisi === 'number') cevap.gorunenSayisi += yeni.length;
+    } catch (e) { /* yan iş: çıkış uyarısını bozmasın */ }
+    return cevap;
+};
+
 /** firin-nobet.js: bildirim listesine listeden düşen La Lorraine ürünlerini ekler */
 globalThis.jbaFirinListeDisi = async function (cevap, sekmeId) {
     if (!cevap || !cevap.ok) return cevap;
@@ -384,8 +443,10 @@ chrome.runtime.onMessage.addListener((m, gonderen, cevapla) => {
         const sekme = gonderen && gonderen.tab ? gonderen.tab.id : null;
         if (Array.isArray(m.bilinen) && m.bilinen.length) await globalThis.jbaFirinBilinenYaz(m.bilinen);
         const t = await ftTedarik(sekme, !!m.tazele);
-        const eksik = await ftListeDisi(Array.isArray(m.adlar) ? m.adlar : [], sekme, true);
-        cevapla({ ok: !!t, zaman: t ? t.zaman : 0, plan: ftPlan(t), eksik });
+        const adlar = Array.isArray(m.adlar) ? m.adlar : [];
+        const eksik = await ftListeDisi(adlar, sekme, true);
+        const stokta = await ftStoktakiler(adlar);
+        cevapla({ ok: !!t, zaman: t ? t.zaman : 0, plan: ftPlan(t), eksik, stokta });
     })().catch(() => cevapla({ ok: false, plan: [], eksik: [] }));
     return true;
 });

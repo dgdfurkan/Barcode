@@ -804,10 +804,14 @@
             urunler: (Array.isArray(d.goods) ? d.goods : []).slice(0, 40).map(function (g) {
                 var ad = g.fullName && typeof g.fullName === 'object' ? (g.fullName.tr || g.fullName.en) : (g.fullName || (g.name && g.name.tr) || '');
                 var gorsel = g.picURL && typeof g.picURL === 'object' ? (g.picURL.tr || g.picURL.en) : g.picURL;
+                var barkodlar = (Array.isArray(g.barcodes) ? g.barcodes : []).map(function (b) {
+                    return typeof b === 'string' ? b : (b && (b.barcode || b.code || b.value)) || '';
+                }).filter(function (b) { return /^[0-9A-Za-z]{4,20}$/.test(String(b)); }).slice(0, 3);
                 return {
                     id: String(g.id || ''),
                     ad: String(ad || '').slice(0, 120),
                     gorsel: /^https:\/\//.test(gorsel || '') ? gorsel : '',
+                    barkodlar: barkodlar,
                     siparis: Number(g.orderedCount) || 0,
                     alinan: Number(g.acceptedCount) || 0
                 };
