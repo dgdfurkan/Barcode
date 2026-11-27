@@ -138,48 +138,27 @@ Arayüze dokunan her işte üçü sırayla kullanılır:
   Tek sebebi `admin_panel_inject.js`. jetbarkod.com.tr ile sınırlandırılabilir.
 - Site ile eklenti arasındaki `postMessage` çağrıları hedef kaynağı `'*'` veriyor. Kısıtlanmalı.
 - `sql_files/security_02_drop_plaintext_password.sql` çalıştırılacak.
-- `sql_files/siparis_canli_v2.sql` çalıştırılacak ve `vps-api/canli.js` + `server.js` VPS'e atılıp servis
-  yeniden başlatılacak (eski `siparis_canli.sql`'i de içeriyor). Anlık kanal, paket ve teslimat bilgisi bunlara
-  bağlı. Çalışana kadar sayfalar yoklamayla idare ediyor, Paketle "sunucu güncellemesi bekleniyor" der.
-- `sql_files/sayim_dongu.sql` çalıştırılacak (Sayım > Döngü: son çekim, döngü ayarı, katalog dışı ürünler).
-  Çalışana kadar Döngü çalışır ama son çekim zamanı yalnız o cihazda kalır.
-- `sql_files/sayim_gecmisi_paylasim.sql` çalıştırılacak. Sayım Geçmişi telefona gitsin ve herkese açık
-  Döngü raporu (`/dongu/#anahtar`) açılsın diye. Çalışana kadar geçmiş yalnız o tarayıcıda, Paylaş düğmesi
-  "sunucu güncellemesi bekleniyor" der.
-- Satıştan Kaldırma: `sql_files/satistan_kaldirma.sql` çalıştırılacak ve `vps-api/kaldirma/` + `server.js`
-  VPS'e atılıp servis yeniden başlatılacak. Çalışana kadar sayfa "sunucu güncellemesi bekleniyor" der,
-  Asistan aktarımı aynı mesajla bekler. Telegram botu ve hesap bağlama sayım raporununki.
-- İtiraz Yazıcı: `sql_files/itiraz_yazici.sql` çalıştırılacak, `vps-api/itiraz/` + `vps-api/katalog.js` + `vps-api/franchise-jeton.js` +
-  `server.js` VPS'e atılıp servis yeniden başlatılacak. Gemini anahtarı JWT_SECRET'tan türetilen anahtarla şifreleniyor;
-  JWT_SECRET değişirse kayıtlı anahtarlar çözülmez (kullanıcı yeniden girer). İstenirse `.env`'e `ITIRAZ_SIFRE` (64 hex) eklenir.
-- Günlük sayım: `sql_files/gunluk_sayim.sql` çalıştırılacak, `vps-api/gunluk-sayim.js` + `server.js` VPS'e atılıp servis
-  yeniden başlatılacak. Çalışana kadar Asistan 06:00'da listeyi yazamaz ("sunucu güncellemesi bekleniyor").
-- Gece raporu: `sql_files/gece_raporu.sql` çalıştırılacak (önce `sayim_gecmisi_paylasim.sql` ve `itiraz_yazici.sql`),
-  `vps-api/gece-raporu/` + `vps-api/katalog.js` + `vps-api/kaldirma/kart.js` + `vps-api/itiraz/index.js` + `server.js` VPS'e atılacak.
-- Telegram Raporları (`/telegram/`): `sql_files/telegram_ayar.sql` çalıştırılacak (önce `gece_raporu.sql`),
-  `vps-api/telegram-ayar.js` + `vps-api/katalog.js` + `vps-api/gece-raporu/` + `vps-api/kaldirma/` VPS'e atılacak.
-  Çalışana kadar sayfa açılır ama yalnız açık/kapalı, bekleyen ve fotoğraf saklanır; rapor yalnız 01:00'de gider.
-- Satıştan Kaldırma ve İtiraz raporları (Telegram Raporları > Kaldırma / İtiraz, kendi saatleri):
-  `sql_files/itiraz_rapor.sql` çalıştırılacak (önce `gece_raporu.sql`), `vps-api/gece-raporu/` + `vps-api/itiraz/` +
-  `vps-api/performans/kart.js` + `vps-api/telegram-ayar.js` VPS'e atılacak. SQL çalışana kadar itiraz kartında
-  sipariş okunamadı der. Kurye ve toplayıcı adı panelin sipariş detayındaki
-  alanından okunuyor (franchise sipariş detayı: `courier.courier`, `picking.picker`).
-- Performans raporu (DPS + kurye, Telegram Raporları > Performans): `vps-api/performans/` + `vps-api/telegram-ayar.js` +
-  `server.js` VPS'e atılacak. Ayar `telegram_ayar.sql` ile kalıcı olur; çalışana kadar zamanlı gönderim ayarı saklanmaz, elle gönderim çalışır.
-- Sayım Farkı (`/sifirlanan/` + Telegram Raporları > Sayım Farkı): `sql_files/sayim_gecmisi_paylasim.sql` ve
-  `sql_files/sayim_fark.sql` (raporlanan görevler) çalıştırılacak; `vps-api/sayim-fark.js` + `vps-api/katalog.js` +
-  `vps-api/telegram-ayar.js` + `vps-api/gece-raporu/` VPS'e atılıp servis yeniden başlatılacak. Asistan değişmedi:
-  sunucu `/api/gece-raporu/ayar` saatlerine sayım farkı saatlerini de ekliyor, Asistan sayımları o saatlerden önce okuyor.
-- Ürün Hareketi (arama ve ajanda kartının sağ üstü, stoktaki "Bugün +24"): `vps-api/depo-jeton.js` VPS'e atılıp
-  servis yeniden başlatılacak (SQL yok). Asistan 0.48.1 depo panelinin jetonunu `users.counting_data._depo_info`'ya
-  yazıyor, sorular sunucudan `/api/depo-panel` ile gidiyor: Getir'in depo ağ geçidi başka siteden gelen tarayıcı
-  isteğini 503'le kesiyor. Jeton 15 dk yaşıyor ve panel yalnız istek attıkça yenileniyor; sipariş panosu açık bilgisayar şart.
-- Anlık red/iptal kartı: `vps-api/kaldirma/index.js` + `vps-api/gece-raporu/index.js` VPS'e atılıp servis yeniden
-  başlatılacak (SQL yok). Red ve iptal 2 dk toplanıp (en çok 6 dk) zamanlı raporun red kartıyla, hasar fotoğraflarıyla
-  gidiyor; kart çizilemezse eski tek tek mesaj. Bekleyen kuyruk bellekte: servis tam o 2 dk içinde yeniden başlarsa o redler gitmez.
-- Mal Kabul Talepleri (`/mal-kabul/`, Yardımcılar): `vps-api/depo-jeton.js` + `vps-api/katalog.js` VPS'e atılıp servis
-  yeniden başlatılacak (SQL yok). Çalışana kadar sayfa "sunucu güncellemesi bekleniyor" der. Form doldurma Asistan 0.60.0
-  (`arka-plan/talep-formu.js`, getir2.my.site.com izni); GÖNDER'e asla basılmaz.
+- **27 Kas 2026: `vps-api/` tamamı VPS'e gönderildi** (rsync, `veri/` hariç tutulmalı) ve servis yeniden başlatıldı.
+  Aşağıdaki işlerin sunucu dosyası kısmı bitti; yalnız SQL'ler bekliyor (hangisinin daha önce çalıştığı doğrulanmadı,
+  kullanıcıya sorulmadan "bitti" sayılmaz). Gönderim tarifi hafızada (`vps-gonderim`).
+  - `sql_files/siparis_canli_v2.sql` (eski `siparis_canli.sql`'i de içeriyor): anlık kanal, paket, teslimat.
+    Çalışana kadar sayfalar yoklamayla idare ediyor, Paketle "sunucu güncellemesi bekleniyor" der.
+  - `sql_files/sayim_dongu.sql`: Döngü son çekim zamanı yalnız o cihazda kalıyor.
+  - `sql_files/sayim_gecmisi_paylasim.sql`: Sayım Geçmişi telefona, herkese açık Döngü raporu (`/dongu/#anahtar`).
+  - `sql_files/satistan_kaldirma.sql`: Satıştan Kaldırma sayfası ve Asistan aktarımı.
+  - `sql_files/itiraz_yazici.sql`: İtiraz Yazıcı. Gemini anahtarı JWT_SECRET'tan türetilen anahtarla şifreli;
+    JWT_SECRET değişirse kayıtlı anahtarlar çözülmez. İstenirse `.env`'e `ITIRAZ_SIFRE` (64 hex).
+  - `sql_files/gunluk_sayim.sql`: Asistan 06:00 listesi.
+  - `sql_files/gece_raporu.sql` (önce `sayim_gecmisi_paylasim.sql` ve `itiraz_yazici.sql`).
+  - `sql_files/telegram_ayar.sql` (önce `gece_raporu.sql`): Telegram Raporları ayarlarının ve Performans zamanlı
+    gönderiminin kalıcılığı.
+  - `sql_files/itiraz_rapor.sql` (önce `gece_raporu.sql`): itiraz kartında sipariş bilgisi. Kurye ve toplayıcı adı
+    franchise sipariş detayından (`courier.courier`, `picking.picker`).
+  - `sql_files/sayim_fark.sql` (+ `sayim_gecmisi_paylasim.sql`): Sayım Farkı raporlanan görevler.
+- Ürün Hareketi ve Mal Kabul Talepleri depo paneli jetonuyla çalışıyor (`/api/depo-panel`): Getir'in depo ağ geçidi
+  başka siteden gelen tarayıcı isteğini 503'le kesiyor. Jeton 15 dk yaşıyor, panel yalnız istek attıkça yenileniyor;
+  depo paneli açık bilgisayar şart. Mal Kabul form doldurma Asistan 0.60.0 (`arka-plan/talep-formu.js`); GÖNDER'e asla basılmaz.
+- Anlık red/iptal kuyruğu bellekte: servis tam o 2 dk içinde yeniden başlarsa o redler gitmez.
 - `sw.js` (kök) sürümlü dosyaları telefonda saklıyor. Bir sorun olursa dosyanın başındaki "KAPATMAK
   GEREKİRSE" bloğu yayınlanır.
 - VPS'te apt upgrade + reboot bekliyor.
