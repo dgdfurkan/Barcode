@@ -449,7 +449,11 @@ app.post('/api/auth/refresh', async (req, res) => {
     // Bu uç gelmeden önce verilmiş token'larda auth_time yok; iat yerine geçiyor.
     const authTime = Number(claims.auth_time || claims.iat || simdi);
     if (simdi - authTime > SESSION_MAX_SECONDS) {
-        return res.status(401).json({ ok: false, error: 'session_too_old', code: 'session_too_old' });
+        /* 403, 401 değil: elindeki token hâlâ geçerli. Asistan 401'i "oturum
+           bitti" sayıp siparişleri hemen durduruyordu; site ise sorunsuz
+           görünüyordu. Token süresi dolunca zaten yeniden giriş gerekiyor. */
+        console.warn('refresh reddedildi (session_too_old):', claims.username);
+        return res.status(403).json({ ok: false, error: 'session_too_old', code: 'session_too_old' });
     }
 
     const clientIP = clientIpOf(req);

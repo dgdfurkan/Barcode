@@ -200,13 +200,16 @@
         var k = j && j.error;
         // Eski sunucu "malkabul"u tanımıyor: gecersiz der ya da uç hiç yok
         if (r.status === 404 || (r.status === 400 && k === 'gecersiz')) return { hata: 'kurulum' };
-        if (k === 'oturum') return { hata: 'oturum' };
+        if (k === 'oturum') return { hata: 'oturum', son: j && Number(j.son) || null };
         if (r.status === 429) return { hata: 'sik' };
         return { hata: k === 'ag' ? 'ag' : 'panel' };
     }
 
     var HATA_METNI = {
         oturum: ['Depo paneli oturumu bulunamadı', 'Depo panelinin açık olduğu bilgisayarda Asistan çalışıyor olmalı. Paneli açıp birkaç saniye sonra yeniden dene.'],
+        'oturum-asistan': ['Bu bilgisayarda Asistan\'ın Jet Barkod oturumu yok', 'Sayfayı yenile. Düzelmezse Jet Barkod\'dan çıkış yapıp yeniden giriş yap; Asistan oturumu bu sayfadan alır.'],
+        'oturum-panel-yok': ['Bu bilgisayarda depo paneli açık değil', 'warehouse.getir.com\'da sipariş ekranını aç, birkaç saniye sonra yeniden dene.'],
+        'oturum-jeton-yok': ['Depo paneli oturumu henüz yakalanmadı', 'Depo paneli sekmesini bir kez yenile, sonra yeniden dene.'],
         kurulum: ['Sunucu güncellemesi bekleniyor', 'Mal kabul kontrolü sunucuya yüklenince çalışacak.'],
         sik: ['Biraz bekle', 'Çok sık soruldu; birkaç saniye sonra yeniden dene.'],
         ag: ['Bağlantı kurulamadı', 'İnternet bağlantını kontrol edip yeniden dene.'],
@@ -214,18 +217,42 @@
         giris: ['Oturum kapandı', 'Yeniden giriş yapman gerekiyor.']
     };
 
+    /* Depo paneli oturumu sunucuda yoksa ya da eskiyse: bu bilgisayardaki
+       Asistan açık panelden jetonu hemen gönderir (eski Asistan cevap vermez,
+       o zaman sebep belirsiz kalır). */
+    var oturumBekleyen = null;
+    function depoOturumuTazele() {
+        return new Promise(function (coz) {
+            if (!asistanVar()) { coz(null); return; }
+            var no = 'do' + Date.now();
+            oturumBekleyen = { no: no, coz: coz, zaman: setTimeout(function () { oturumBekleyen = null; coz(null); }, 11000) };
+            global.postMessage({ type: 'JB_DEPO_OTURUM_TAZELE', no: no }, location.origin);
+        });
+    }
+
     async function kontrolEt() {
         if (d.yukleniyor) return;
         var gun = gunAnahtari(d.gunGeri);
         var no = ++d.istekNo;
         d.yukleniyor = true;
         d.hata = null;
+        d.hataSon = null;
         ciz();
         var c = await panelOku(gun);
         if (no !== d.istekNo) return;
+        if (c.hata === 'oturum') {
+            var t = await depoOturumuTazele();
+            if (no !== d.istekNo) return;
+            if (t && t.ok) {
+                c = await panelOku(gun);
+                if (no !== d.istekNo) return;
+            } else if (t && t.sebep === 'oturum') c.hata = 'oturum-asistan';
+            else if (t && t.sebep === 'panel-yok') c.hata = 'oturum-panel-yok';
+            else if (t && t.sebep === 'jeton-yok') c.hata = 'oturum-jeton-yok';
+        }
         d.yukleniyor = false;
         if (c.hata === 'giris') { bolum('mkGiris'); return; }
-        if (c.hata) { d.hata = c.hata; ciz(); return; }
+        if (c.hata) { d.hata = c.hata; d.hataSon = c.son || null; ciz(); return; }
         // Daha önce panelden alınan ya da elle yazılan ad/barkod yeni okumada kaybolmasın
         var eski = d.kayit.gunler[gun];
         var bilinen = {};
@@ -594,6 +621,10 @@
         } else if (d.hata) {
             baslik = HATA_METNI[d.hata][0];
             alt = HATA_METNI[d.hata][1];
+            if (d.hata === 'oturum') {
+                alt = (d.hataSon ? 'Depo paneli oturumu en son ' + saat(d.hataSon) + '\'de geldi. ' : 'Bu hesaba depo paneli oturumu hiç gelmedi. ') +
+                    'Depo panelinin açık olduğu bilgisayarda panelin sol altında kırmızı "Jet Barkod oturumu yok" şeridi varsa "Oturumu bağla"ya bas.';
+            }
         } else if (g) {
             var l = g.liste;
             var bitti = l.filter(function (p) { return BITTI.indexOf(p.durum) !== -1; }).length;
@@ -917,6 +948,15 @@
         if (e.source !== global || e.origin !== location.origin) return;
         var m = e.data;
         if (!m) return;
+        if (m.type === 'JB_DEPO_OTURUM_SONUC') {
+            if (oturumBekleyen && m.no === oturumBekleyen.no) {
+                var b0 = oturumBekleyen;
+                oturumBekleyen = null;
+                clearTimeout(b0.zaman);
+                b0.coz({ ok: !!m.ok, sebep: String(m.sebep || '') });
+            }
+            return;
+        }
         if (m.type === 'JB_URUN_BILGI_SONUC') {
             if (bilgiBekleyen && m.no === bilgiBekleyen.no) bilgiBitti(m);
             return;

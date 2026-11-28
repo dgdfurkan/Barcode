@@ -33,6 +33,16 @@
         } catch (err) { /* yetim bağlam */ }
     });
 
+    /* Siteden oturum tazeleme (arka-plan/depo-jeton.js djTazele): köprü
+       yakaladığı son jetonu yeniden duyurur, yukarıdaki dinleyici gönderir. */
+    try {
+        chrome.runtime.onMessage.addListener(function (m) {
+            if (!m || m.type !== 'JBA_DEPO_JETON_ISTE') return false;
+            try { global.postMessage({ type: 'JB_JETON_SOR' }, location.origin); } catch (e) { /* sessiz */ }
+            return false;
+        });
+    } catch (e) { /* yetim bağlam */ }
+
     /* Mal Kabul Talepleri: arka plan (arka-plan/talep-formu.js) katalogda olmayan
        ürünlerin adını açık panel sekmesine soruyor; soru sayfa köprüsüne gider. */
     var urunNo = 0;

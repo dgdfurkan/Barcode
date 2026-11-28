@@ -19,6 +19,10 @@ const DJ_ARA_MS = 20 * 1000;
 let djBekleyen = null;
 let djZamanlayici = null;
 let djCalisiyor = false;
+/* Mal Kabul "oturum yok" dediğinde site tazeleme istiyor: aynı jeton da
+   beklemeden yeniden gönderilir, sonucu siteye söylenir. */
+let djZorla = false;
+let djSonuc = { zaman: 0, durum: 0, sebep: '' };
 
 async function djGonder() {
     if (djCalisiyor || !djBekleyen) return;
@@ -28,12 +32,14 @@ async function djGonder() {
     try {
         const r = await chrome.storage.local.get(DJ_SON);
         const son = r[DJ_SON] || {};
-        if (son.token === is.jeton) return;
+        const zorla = djZorla;
+        djZorla = false;
+        if (son.token === is.jeton && !zorla) return;
 
         const al = globalThis.jbaYetkiAl;
         if (typeof al !== 'function') return;
         let yetki = await al(false);
-        if (!yetki) return;
+        if (!yetki) { djSonuc = { zaman: Date.now(), durum: 0, sebep: 'oturum' }; return; }
         const govde = JSON.stringify({ token: is.jeton, warehouseId: is.depo });
         let cevap = null;
         for (let deneme = 0; deneme < 2; deneme++) {
@@ -55,8 +61,9 @@ async function djGonder() {
         }
         // 400: jeton geçersiz, aynısını tekrar göndermeye gerek yok. 404 (sunucu
         // henüz güncellenmedi) sayılmaz: kurulunca aynı jeton yine gider.
+        djSonuc = { zaman: Date.now(), durum: cevap ? cevap.status : 0, sebep: cevap ? (cevap.ok ? '' : 'sunucu') : 'ag' };
         if (cevap && (cevap.ok || cevap.status === 400)) {
-            await chrome.storage.local.set({ [DJ_SON]: { token: is.jeton, zaman: Date.now() } });
+            await chrome.storage.local.set({ [DJ_SON]: { token: is.jeton, zaman: Date.now(), depo: is.depo } });
         }
     } catch (e) {
         /* sessiz: bir sonraki jetonda tekrar denenir */
@@ -67,6 +74,11 @@ async function djGonder() {
 }
 
 function djPlanla() {
+    if (djZorla) {
+        if (djZamanlayici) { clearTimeout(djZamanlayici); djZamanlayici = null; }
+        djZamanlayici = setTimeout(() => { djZamanlayici = null; djGonder(); }, 0);
+        return;
+    }
     if (djZamanlayici) return;
     chrome.storage.local.get(DJ_SON).then((r) => {
         const son = (r && r[DJ_SON]) || {};
@@ -85,6 +97,45 @@ chrome.runtime.onMessage.addListener((istek) => {
     djBekleyen = { jeton, depo };
     djPlanla();
     return false;
+});
+
+/*
+ * Siteden tazeleme (Mal Kabul Talepleri "oturum yok" dediğinde): açık panel
+ * sekmelerinden güncel jeton istenir ve beklemeden gönderilir. Getir'e istek
+ * gitmez; jeton panelin zaten attığı isteklerden yakalanmış olandır.
+ *   sebep: oturum (Asistan'ın Jet Barkod oturumu yok) · panel-yok · jeton-yok
+ *          (panel henüz istek atmadı) · sunucu · ag
+ */
+async function djTazele() {
+    const al = globalThis.jbaYetkiAl;
+    if (typeof al !== 'function' || !(await al(false))) return { ok: false, sebep: 'oturum' };
+    let sekmeler = [];
+    try {
+        sekmeler = (await chrome.tabs.query({ url: 'https://warehouse.getir.com/r/*' })).filter((t) => !t.discarded);
+    } catch (e) { sekmeler = []; }
+    if (!sekmeler.length) return { ok: false, sebep: 'panel-yok' };
+    await djSekmelereSok();
+    const bas = Date.now();
+    djZorla = true;
+    for (const t of sekmeler.slice(0, 3)) {
+        try { await chrome.tabs.sendMessage(t.id, { type: 'JBA_DEPO_JETON_ISTE' }); } catch (e) { /* betik yok */ }
+    }
+    // Gönderim bitene kadar en çok 8 sn bekle
+    while (Date.now() - bas < 8000) {
+        await new Promise((c) => setTimeout(c, 250));
+        if (djSonuc.zaman >= bas && !djCalisiyor) {
+            if (djSonuc.durum >= 200 && djSonuc.durum < 300) return { ok: true };
+            return { ok: false, sebep: djSonuc.sebep || 'sunucu', durum: djSonuc.durum };
+        }
+    }
+    djZorla = false;
+    return { ok: false, sebep: 'jeton-yok' };
+}
+
+chrome.runtime.onMessage.addListener((istek, gonderen, cevapla) => {
+    if (!istek || istek.type !== 'JBA_DEPO_JETON_TAZELE') return false;
+    djTazele().then(cevapla, () => cevapla({ ok: false, sebep: 'ag' }));
+    return true;
 });
 
 /* Chrome güncellenen eklentinin içerik betiğini önceden açık sekmelere

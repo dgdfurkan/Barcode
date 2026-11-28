@@ -81,6 +81,7 @@ const OTURUM_ANAHTARI = 'jbaSiparisOturum';
 const YETKI_ALARMI = 'jbaYetkiTazele';
 
 let tazelemeSozu = null;
+let sonYenilemeHatasi = 0;   // başarısız tazelemeden sonra 10 dk her yazmada yeniden sorulmaz
 let oturumSaglam = null;
 let oturumSebep = '';
 
@@ -154,12 +155,16 @@ function yetkiTazele(zorla, isVar) {
         if (!y) { if (isVar) oturumDurumuYay(false, 'jeton-yok'); return null; }
         const o = jetonOmru(y.token);
         if (o && o.kalan <= 0) { if (isVar) oturumDurumuYay(false, 'suresi-doldu'); return null; }
-        const vakti = zorla || !o || o.kalan < o.omur * 0.5;
+        const vakti = zorla || ((!o || o.kalan < o.omur * 0.5) && Date.now() - sonYenilemeHatasi > 10 * 60000);
         if (!vakti) { oturumDurumuYay(true); return y; }
+        // Takılan istek bütün yazmaları bekletmesin: 12 sn
+        const ctrl = new AbortController();
+        const zaman = setTimeout(() => ctrl.abort(), 12000);
         try {
             const r = await fetch(YENILEME_UCU, {
                 method: 'POST',
-                headers: { 'Authorization': 'Bearer ' + y.token }
+                headers: { 'Authorization': 'Bearer ' + y.token },
+                signal: ctrl.signal
             });
             let v = null;
             try { v = await r.json(); } catch (e) { /* gövde yok */ }
@@ -168,11 +173,18 @@ function yetkiTazele(zorla, isVar) {
                 oturumDurumuYay(true);
                 return await yetkiOku();
             }
-            if (r.status === 401) {
-                oturumDurumuYay(false, (v && v.code) || 'gecersiz');
+            /* Jeton gerçekten geçersizse dur. "Oturum çok eski" (30 günlük üst
+               sınır) ise elimizdeki jeton süresi dolana kadar geçerli: siparişler
+               durmasın. Eskiden bu da 401'di ve iş bilgisayarında siparişler,
+               site sorunsuz görünürken kesiliyordu. */
+            sonYenilemeHatasi = Date.now();
+            const kod = (v && v.code) || '';
+            if (r.status === 401 && kod !== 'session_too_old') {
+                oturumDurumuYay(false, kod || 'gecersiz');
                 return null;
             }
-        } catch (e) { /* ağ yok: elimizdeki jetonla devam */ }
+        } catch (e) { sonYenilemeHatasi = Date.now(); /* ağ yok ya da zaman aşımı: elimizdeki jetonla devam */ }
+        finally { clearTimeout(zaman); }
         // Yenilenemedi ama jeton hâlâ geçerli: onunla sürdür
         if (o && o.kalan > 0 && !zorla) { oturumDurumuYay(true); return y; }
         return zorla ? null : y;
@@ -875,6 +887,7 @@ chrome.runtime.onMessage.addListener((istek, gonderen, cevapla) => {
     if (!istek || typeof istek.type !== 'string') return;
 
     if (istek.type === 'JBA_SIPARIS_YETKI') {
+        sonYenilemeHatasi = 0;
         yetkiYaz(istek.token, istek.username).then((ok) => {
             if (ok) {
                 oturumDurumuYay(true);

@@ -61,6 +61,14 @@ let knCalisiyor = false;
 let knSon = null;            // son sonuç (sekme yeniden açılınca hemen çizilsin)
 let knSonSes = 0;
 let knOncekiImza = '';
+/* Takılan bir istek kontrolü kilitli bırakmasın; hata olunca eski kart ekranda
+   kalmasın (kurye girmiş ama "kurye eksik" duruyordu). */
+let knCalismaNo = 0;
+let knBaslangic = 0;
+let knHataSay = 0;
+let knSonBasari = 0;
+const KN_ISTEK_MS = 12000;
+const KN_KILIT_MS = 45000;
 
 /** Eşikler kullanıcının yazdığı dakika (1-600); boş ya da 0 kapalı.
     0.57'deki tek "meşgul eşiği" (molaDk) varsa ona taşınır. */
@@ -128,11 +136,21 @@ async function knOturum(sekmeler) {
 }
 
 async function knGetir(o, yol, govde) {
-    const r = await fetch(KN_GETIR + yol, {
-        method: govde ? 'POST' : 'GET',
-        headers: { 'Content-Type': 'application/json', Accept: 'application/json', Authorization: o.yetki },
-        body: govde ? JSON.stringify(govde) : undefined,
-    });
+    const ctrl = new AbortController();
+    const zaman = setTimeout(() => ctrl.abort(), KN_ISTEK_MS);
+    let r;
+    try {
+        r = await fetch(KN_GETIR + yol, {
+            method: govde ? 'POST' : 'GET',
+            headers: { 'Content-Type': 'application/json', Accept: 'application/json', Authorization: o.yetki },
+            body: govde ? JSON.stringify(govde) : undefined,
+            signal: ctrl.signal,
+        });
+    } catch (e) {
+        throw new Error(e && e.name === 'AbortError' ? 'zaman aşımı' : 'ağ');
+    } finally {
+        clearTimeout(zaman);
+    }
     if (r.status === 401 || r.status === 403) { const h = new Error('oturum'); h.kod = 'oturum'; throw h; }
     if (!r.ok) throw new Error('http ' + r.status);
     return r.json();
@@ -297,8 +315,20 @@ async function knUyari(sonuc, sim, esikler) {
         type: 'JBA_KURYE_UYARI', sim: !!sim,
         eksik: eksikGoster ? { planlanan: sonuc.planlanan, aktif: sonuc.aktif, eksik: sonuc.eksik, sayi: sonuc.sayi,
             mesgul: sonuc.mola.slice().sort((a, b) => (b.dk || 0) - (a.dk || 0)) } : null,
-        mola: uzun, zaman: simdi,
+        mola: uzun, zaman: simdi, sn: knAyar.sn,
     };
+}
+
+/* Kontrol başarısız: ilk aksaklıkta kart olduğu gibi kalır (bir sonraki kontrol
+   düzeltir); üst üste ikinci hatada ya da 1 dk başarı yoksa eski kart kalkar,
+   yerine gri "güncellenemiyor" notu gelir. Ses çalmaz. */
+async function knHata(metin, sekmeler) {
+    await knDurumYaz({ hata: metin });
+    knHataSay++;
+    if (knHataSay < 2 && Date.now() - knSonBasari < 60000) return;
+    knSon = null;
+    knOncekiImza = '';
+    await knYay({ type: 'JBA_KURYE_UYARI', sim: false, eksik: null, mola: [], hata: metin, zaman: Date.now(), sn: knAyar.sn }, sekmeler);
 }
 
 async function knYay(mesaj, sekmeler) {
@@ -323,7 +353,7 @@ async function knDurumYaz(d) {
 }
 
 async function knKontrol(zorla) {
-    if (knCalisiyor) return;
+    if (knCalisiyor && Date.now() - knBaslangic < KN_KILIT_MS) return;
     await knAyarOku();
     if (!knAyar.acik) return;
     if (!zorla && !knMesaiMi()) return;
@@ -331,26 +361,34 @@ async function knKontrol(zorla) {
     const sekmeler = await knPanoSekmeleri();
     if (!sekmeler.length) return; // uyarı gösterilecek yer yoksa istek de yok
     knCalisiyor = true;
+    const no = ++knCalismaNo;
+    knBaslangic = Date.now();
     knSonKontrol = Date.now();
     try {
         const o = await knOturum(sekmeler);
-        if (o.hata) { await knDurumYaz({ hata: o.hata }); return; }
+        if (o.hata) { await knHata(o.hata, sekmeler); return; }
         const sehir = await knSehir(o);
         // Plan saatlik; panel yalnız saat başını kabul ediyor, anlık zamanla boş dönüyor
         const saatBasi = new Date(); saatBasi.setMinutes(0, 0, 0);
         const plan = await knGetir(o, '/warehouses/courier-plan/' + sehir + '?currentDate=' + saatBasi.getTime());
         const kur = await knGetir(o, '/courier/filter', { isLoggedIn: true });
-        knSon = knHesapla(plan, kur && kur.couriers, o.depo, Date.now());
-        await knIadeEkle(o, knSon);
-        await knGrupTakip(knSon);
+        const sonuc = knHesapla(plan, kur && kur.couriers, o.depo, Date.now());
+        await knIadeEkle(o, sonuc);
+        await knGrupTakip(sonuc);
+        if (no !== knCalismaNo) return;   // kilit aşıldı, daha yeni bir kontrol çalışıyor
+        knSon = sonuc;
+        knHataSay = 0;
+        knSonBasari = Date.now();
         const mesaj = await knUyari(knSon, false);
         await knYay(mesaj, sekmeler);
         await knSes(mesaj);
         await knDurumYaz({ planlanan: knSon.planlanan, aktif: knSon.aktif, eksik: knSon.eksik, sayi: knSon.sayi, uzunMola: mesaj.mola.length });
     } catch (e) {
-        await knDurumYaz({ hata: e && e.kod === 'oturum' ? 'Franchise oturumu geçersiz: franchise-v2.getir.com sekmesini yenile.' : 'Okunamadı (' + String(e && e.message || e).slice(0, 40) + ')' });
+        if (no === knCalismaNo) {
+            await knHata(e && e.kod === 'oturum' ? 'Franchise oturumu geçersiz: franchise-v2.getir.com sekmesini yenile.' : 'Kurye bilgisi okunamadı (' + String(e && e.message || e).slice(0, 40) + ').', sekmeler);
+        }
     } finally {
-        knCalisiyor = false;
+        if (no === knCalismaNo) knCalisiyor = false;
     }
 }
 
@@ -457,7 +495,7 @@ chrome.runtime.onMessage.addListener((m, gonderen, cevapla) => {
         return true;
     }
     if (m.type === 'JBA_KURYE_PANO_HAZIR') {
-        (async () => { if (knSon && Date.now() - knSon.zaman < 5 * 60000) await knYay(await knUyari(knSon, false), gonderen.tab ? [gonderen.tab] : null); })();
+        (async () => { if (knSon && Date.now() - knSon.zaman < Math.max(60000, knAyar.sn * 3000)) await knYay(await knUyari(knSon, false), gonderen.tab ? [gonderen.tab] : null); })();
         return false;
     }
     if (m.type === 'JBA_KURYE_SIM') { knSimulasyon().then(cevapla, () => cevapla({ ok: false })); return true; }

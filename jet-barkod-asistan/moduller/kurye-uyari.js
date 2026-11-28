@@ -27,6 +27,12 @@
     var gizliImza = '';
     var simZaman = null;
     var gercek = null; // simülasyon ekrandayken gelen son gerçek uyarı
+    /* Bayat kart: arka plandan son gerçek bilgi geldiğinden beri kontrol
+       aralığının 3 katı (en az 45 sn) geçtiyse kart kalkar. Kontrol takıldığında,
+       mesai bittiğinde ya da franchise oturumu düştüğünde eski "kurye eksik"
+       ekranda kalmasın. */
+    var sonGelis = 0;
+    var sonSn = 15;
 
     var IKON_KURYE = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="17" r="3"/><circle cx="18" cy="17" r="3"/><path d="M9 17h6M13 7h3l2.5 10M6 14l3-5h5"/></svg>';
     var IKON_SAAT = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/></svg>';
@@ -53,6 +59,8 @@
         '.kart--toplama { --vurgu: #7c3aed; --zemin: #f3edff; --yazi: #6d28d9; }',
         '.kart--yolda { --vurgu: #0e9f6e; --zemin: #eafaf4; --yazi: #047857; }',
         '.kart--sipariste { --vurgu: #344054; --zemin: #f2f4f7; --yazi: #111827; }',
+        '.kart--hata { --vurgu: #98a2b3; --zemin: #f2f4f7; --yazi: #475467; padding: 12px 14px; box-shadow: 0 8px 24px rgba(16,24,40,.12), 0 0 0 1px rgba(16,24,40,.06); }',
+        '.kart--hata .baslik { font-size: 13px; line-height: 18px; }',
         '@keyframes gir { from { opacity: 0; transform: translateX(-12px); } to { opacity: 1; transform: none; } }',
         '.ust { display: flex; align-items: center; gap: 12px; }',
         '.ikon { flex: none; width: 40px; height: 40px; border-radius: 12px; background: var(--zemin); color: var(--yazi); display: grid; place-items: center; position: relative; }',
@@ -165,7 +173,15 @@
 
     function imza(m) {
         if (!m) return '';
+        if (m.hata) return 'h:' + m.hata;
         return (m.eksik ? 'e' + m.eksik.eksik : '') + '|' + (m.mola || []).map(function (x) { return x.id; }).join(',');
+    }
+
+    function hataHtml(metin) {
+        return '<div class="kart kart--hata" role="status"><div class="ust">' +
+            '<span class="ikon">' + IKON_KURYE + '</span>' +
+            '<div class="metin"><p class="baslik">Kurye bilgisi güncellenemiyor</p><p class="alt">' + kacir(metin) + '</p></div>' +
+            '<button type="button" class="kapat" data-kapat aria-label="Kapat">' + IKON_X + '</button></div></div>';
     }
 
     function kaldir() {
@@ -176,9 +192,10 @@
 
     function ciz(m) {
         son = m;
-        if (!etkin || !m || (!m.eksik && !(m.mola && m.mola.length))) { kaldir(); return; }
+        if (!etkin || !m || (!m.hata && !m.eksik && !(m.mola && m.mola.length))) { kaldir(); return; }
         if (!m.sim && gizliImza && gizliImza === imza(m)) { kaldir(); return; }
-        var html = (m.eksik ? eksikHtml(m.eksik, m.sim) : '') + (m.mola || []).slice(0, 4).map(function (x) { return molaHtml(x, m.sim && !m.eksik); }).join('');
+        var html = m.hata ? hataHtml(m.hata)
+            : (m.eksik ? eksikHtml(m.eksik, m.sim) : '') + (m.mola || []).slice(0, 4).map(function (x) { return molaHtml(x, m.sim && !m.eksik); }).join('');
         if (!kap) {
             kap = document.createElement('div');
             kap.setAttribute('data-jba', 'kurye-uyari');
@@ -224,7 +241,12 @@
     try {
         chrome.runtime.onMessage.addListener(function (m) {
             if (!m || m.type !== 'JBA_KURYE_UYARI') return false;
-            var veri = { eksik: m.eksik || null, mola: Array.isArray(m.mola) ? m.mola : [], sim: !!m.sim };
+            var veri = { eksik: m.eksik || null, mola: Array.isArray(m.mola) ? m.mola : [], sim: !!m.sim,
+                hata: !m.sim && typeof m.hata === 'string' ? m.hata.slice(0, 140) : '' };
+            if (!veri.sim) {
+                sonGelis = Date.now();
+                sonSn = Math.max(5, Math.min(600, Number(m.sn) || 15));
+            }
             if (veri.sim) {
                 if (son && !son.sim) gercek = son;
                 ciz(veri);
@@ -239,6 +261,15 @@
             return false;
         });
     } catch (e) { /* yetim bağlam */ }
+
+    setInterval(function () {
+        if (!son || son.sim || !sonGelis) return;
+        if (Date.now() - sonGelis <= Math.max(45000, sonSn * 3000)) return;
+        son = null;
+        gercek = null;
+        sonGelis = 0;
+        kaldir();
+    }, 10000);
 
     JBA.kayit({
         kimlik: 'kuryeUyari',

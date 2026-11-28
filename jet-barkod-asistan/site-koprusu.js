@@ -168,6 +168,14 @@
             });
             return;
         }
+        /* Mal Kabul "depo paneli oturumu yok": bu bilgisayardaki panelden jeton hemen gönderilir */
+        if (d.type === 'JB_DEPO_OTURUM_TAZELE') {
+            var dno = String(d.no || '').slice(0, 40);
+            arkaPlana({ type: 'JBA_DEPO_JETON_TAZELE' }, function (y) {
+                gonder({ type: 'JB_DEPO_OTURUM_SONUC', no: dno, ok: !!(y && y.ok), sebep: String((y && y.sebep) || (y ? '' : 'asistan')).slice(0, 40) });
+            });
+            return;
+        }
         if (d.type === 'JB_URUN_BILGI_ISTE' && Array.isArray(d.idler)) {
             var uno = String(d.no || '').slice(0, 40);
             arkaPlana({ type: 'JBA_URUN_BILGI', idler: d.idler.slice(0, 100) }, function (y) {
